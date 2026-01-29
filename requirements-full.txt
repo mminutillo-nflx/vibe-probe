@@ -1,0 +1,51 @@
+# Full requirements including all optional dependencies
+# Note: Some packages may have Python version constraints
+
+# Core dependencies (required)
+aiohttp>=3.9.0
+dnspython>=2.4.0
+python-whois>=0.8.0
+cryptography>=41.0.0
+pyOpenSSL>=23.3.0
+certifi>=2023.7.22
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Web scraping
+requests>=2.31.0
+
+# Report generation (required)
+jinja2>=3.1.2
+markdown>=3.5
+
+# Utilities (required)
+python-dotenv>=1.0.0
+colorama>=0.4.6
+pyyaml>=6.0.1
+python-dateutil>=2.8.2
+
+# API clients (optional - install if you have API keys)
+shodan>=1.30.0
+PyGithub>=2.1.1
+newsapi-python>=0.2.7
+tweepy>=4.14.0
+ipwhois>=1.2.0
+
+# Rate limiting and caching
+ratelimit>=2.2.1
+cachetools>=5.3.2
+
+# PDF generation (optional - may require system dependencies)
+# weasyprint>=60.0
+
+# Advanced features (install separately if needed)
+# Note: Some of these may not work with Python 3.14+
+# selenium>=4.15.0
+# playwright>=1.40.0
+# python-nmap>=0.7.1
+# pandas>=2.1.0
+# builtwith>=1.3.6
+# geoip2>=4.7.0
+# newspaper3k>=0.2.8
+# praw>=7.7.1
+# waybackpy>=3.0.6

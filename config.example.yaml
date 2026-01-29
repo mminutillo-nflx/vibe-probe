@@ -1,0 +1,25 @@
+# Vibe Probe Configuration Example
+# Copy this file to config.yaml and add your API keys
+
+# API Keys (alternatively use environment variables)
+shodan_api_key: YOUR_SHODAN_API_KEY_HERE
+censys_api_id: YOUR_CENSYS_API_ID_HERE
+censys_api_secret: YOUR_CENSYS_API_SECRET_HERE
+virustotal_api_key: YOUR_VIRUSTOTAL_API_KEY_HERE
+github_token: YOUR_GITHUB_TOKEN_HERE
+twitter_bearer_token: YOUR_TWITTER_BEARER_TOKEN_HERE
+newsapi_key: YOUR_NEWSAPI_KEY_HERE
+hibp_api_key: YOUR_HIBP_API_KEY_HERE
+securitytrails_api_key: YOUR_SECURITYTRAILS_API_KEY_HERE
+
+# Scan Options
+verbose: false
+output_dir: ./reports
+
+# Probe Selection (comment out to disable specific probes)
+# selected_probes:
+#   - dns
+#   - whois
+#   - ssl
+#   - ports
+#   - http

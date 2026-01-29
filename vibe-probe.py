@@ -1,0 +1,190 @@
+#!/Library/Frameworks/Python.framework/Versions/3.14/bin/python3
+"""
+Vibe Probe - Comprehensive OSINT Reconnaissance Tool
+"""
+
+import argparse
+import asyncio
+import sys
+from pathlib import Path
+from datetime import datetime, timezone
+from typing import Dict, List, Any
+
+from probes import (
+    dns_probe,
+    whois_probe,
+    ssl_probe,
+    subdomain_probe,
+    port_probe,
+    http_probe,
+    tech_probe,
+    email_probe,
+    security_headers_probe,
+    certificate_transparency_probe,
+    cloud_detection_probe,
+    reputation_probe,
+    web_intelligence_probe,
+    social_media_probe,
+    breach_probe,
+    github_probe,
+    shodan_probe,
+    wayback_probe,
+    geolocation_probe,
+    asn_probe,
+)
+from reporter import ReportGenerator
+from utils.config import Config
+from utils.logger import setup_logger
+
+__version__ = "1.0.0"
+
+
+class VibeProbe:
+    """Main OSINT reconnaissance orchestrator"""
+
+    def __init__(self, target: str, config: Config):
+        self.target = target
+        self.config = config
+        self.logger = setup_logger(config.verbose)
+        self.results: Dict[str, Any] = {
+            "target": target,
+            "scan_time": datetime.now(timezone.utc).isoformat(),
+            "probes": {}
+        }
+
+    async def run_all_probes(self):
+        """Execute all OSINT probes concurrently"""
+        self.logger.info(f"Starting comprehensive OSINT scan on: {self.target}")
+
+        # Define all probe modules with their priority
+        probe_modules = [
+            ("dns", dns_probe.DNSProbe, "critical"),
+            ("whois", whois_probe.WhoisProbe, "high"),
+            ("ssl", ssl_probe.SSLProbe, "high"),
+            ("subdomains", subdomain_probe.SubdomainProbe, "high"),
+            ("ports", port_probe.PortProbe, "critical"),
+            ("http", http_probe.HTTPProbe, "high"),
+            ("technology", tech_probe.TechProbe, "medium"),
+            ("emails", email_probe.EmailProbe, "medium"),
+            ("security_headers", security_headers_probe.SecurityHeadersProbe, "high"),
+            ("certificate_transparency", certificate_transparency_probe.CTProbe, "medium"),
+            ("cloud_detection", cloud_detection_probe.CloudProbe, "medium"),
+            ("reputation", reputation_probe.ReputationProbe, "critical"),
+            ("web_intelligence", web_intelligence_probe.WebIntelProbe, "high"),
+            ("social_media", social_media_probe.SocialMediaProbe, "medium"),
+            ("breaches", breach_probe.BreachProbe, "critical"),
+            ("github", github_probe.GitHubProbe, "high"),
+            ("shodan", shodan_probe.ShodanProbe, "high"),
+            ("wayback", wayback_probe.WaybackProbe, "low"),
+            ("geolocation", geolocation_probe.GeolocationProbe, "low"),
+            ("asn", asn_probe.ASNProbe, "medium"),
+        ]
+
+        # Create tasks for concurrent execution
+        tasks = []
+        for probe_name, probe_class, priority in probe_modules:
+            if self.config.should_run_probe(probe_name):
+                probe = probe_class(self.target, self.config)
+                task = self._run_probe(probe_name, probe, priority)
+                tasks.append(task)
+
+        # Execute all probes concurrently
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        self.logger.info("All probes completed")
+
+    async def _run_probe(self, name: str, probe: Any, priority: str):
+        """Run a single probe with error handling"""
+        try:
+            self.logger.info(f"Running {name} probe...")
+            result = await probe.scan()
+            self.results["probes"][name] = {
+                "priority": priority,
+                "status": "success",
+                "data": result
+            }
+        except Exception as e:
+            self.logger.error(f"Error in {name} probe: {str(e)}")
+            self.results["probes"][name] = {
+                "priority": priority,
+                "status": "error",
+                "error": str(e)
+            }
+
+    def generate_report(self, output_format: str = "all"):
+        """Generate comprehensive report"""
+        self.logger.info("Generating reports...")
+
+        reporter = ReportGenerator(self.results, self.config)
+
+        output_dir = Path(self.config.output_dir) / self.target / datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        reports = []
+        if output_format in ["all", "json"]:
+            json_path = reporter.generate_json(output_dir)
+            reports.append(json_path)
+
+        if output_format in ["all", "html"]:
+            html_path = reporter.generate_html(output_dir)
+            reports.append(html_path)
+
+        if output_format in ["all", "markdown"]:
+            md_path = reporter.generate_markdown(output_dir)
+            reports.append(md_path)
+
+        if output_format in ["all", "pdf"]:
+            pdf_path = reporter.generate_pdf(output_dir)
+            reports.append(pdf_path)
+
+        self.logger.info(f"Reports generated in: {output_dir}")
+        for report in reports:
+            self.logger.info(f"  - {report}")
+
+        return output_dir
+
+
+async def main():
+    parser = argparse.ArgumentParser(
+        description="Vibe Probe - Comprehensive OSINT Reconnaissance Tool",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s example.com
+  %(prog)s example.com --format html
+  %(prog)s example.com --probes dns,whois,ssl
+  %(prog)s example.com --verbose --output ./reports
+        """
+    )
+
+    parser.add_argument("target", help="Target domain to investigate")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("-o", "--output", default="./reports", help="Output directory for reports")
+    parser.add_argument("-f", "--format", choices=["all", "json", "html", "markdown", "pdf"],
+                       default="all", help="Report format (default: all)")
+    parser.add_argument("-p", "--probes", help="Comma-separated list of probes to run (default: all)")
+    parser.add_argument("-c", "--config", help="Path to config file")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+
+    args = parser.parse_args()
+
+    # Load configuration
+    config = Config(args.config, args)
+
+    # Initialize and run probe
+    probe = VibeProbe(args.target, config)
+    await probe.run_all_probes()
+    probe.generate_report(args.format)
+
+    print(f"\n✓ OSINT reconnaissance complete for {args.target}")
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n\nScan interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n✗ Fatal error: {e}")
+        sys.exit(1)

@@ -1,0 +1,5 @@
+#!/bin/bash
+# Wrapper script to run vibe-probe with the correct Python
+
+# Use python3 which has all dependencies installed
+python3 "$(dirname "$0")/vibe-probe.py" "$@"
