@@ -287,6 +287,37 @@ class ReportGenerator:
             margin-top: 20px;
         }
 
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 56px;
+            height: 28px;
+            background: var(--border);
+            border-radius: 28px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: var(--primary);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(28px);
+        }
+
         /* Probe Status */
         .probe-list {
             display: grid;
@@ -636,12 +667,14 @@ class ReportGenerator:
 
         <!-- Advanced Mode Toggle -->
         <div class="toggle-section">
-            <div class="toggle-header" onclick="toggleAdvancedMode()">
+            <div class="toggle-header" onclick="toggleAdvancedMode()" style="cursor: pointer;">
                 <div class="toggle-title">
                     <span>🔧</span>
                     <span>Advanced Mode - Show Technical Details</span>
                 </div>
-                <div class="toggle-icon" id="advanced-mode-icon">▶</div>
+                <div class="toggle-switch" id="advanced-mode-switch">
+                    <div class="toggle-slider"></div>
+                </div>
             </div>
         </div>
 
@@ -734,11 +767,11 @@ class ReportGenerator:
         }
 
         function toggleAdvancedMode() {
-            const icon = document.getElementById('advanced-mode-icon');
+            const toggleSwitch = document.getElementById('advanced-mode-switch');
             const advancedSections = document.querySelectorAll('.advanced-data');
 
-            icon.classList.toggle('open');
-            const isActive = icon.classList.contains('open');
+            toggleSwitch.classList.toggle('active');
+            const isActive = toggleSwitch.classList.contains('active');
 
             advancedSections.forEach(section => {
                 if (isActive) {
