@@ -1,9 +1,17 @@
 """HTTP/HTTPS probe"""
 
 import aiohttp
+import base64
 from typing import Dict, Any
 from urllib.parse import urljoin
 from .base_probe import BaseProbe
+
+# Optional playwright for screenshots
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
 
 
 class HTTPProbe(BaseProbe):
@@ -52,6 +60,9 @@ class HTTPProbe(BaseProbe):
 
         # Check sitemap
         results["sitemap"] = await self._check_sitemap()
+
+        # Capture screenshot of homepage
+        results["screenshot"] = await self._capture_screenshot()
 
         return results
 
@@ -172,5 +183,55 @@ class HTTPProbe(BaseProbe):
                                 return result
                 except Exception:
                     continue
+
+        return result
+
+    async def _capture_screenshot(self) -> Dict[str, Any]:
+        """Capture screenshot of homepage"""
+        result = {"success": False, "data": None, "error": None}
+
+        if not PLAYWRIGHT_AVAILABLE:
+            result["error"] = "Playwright not installed"
+            return result
+
+        try:
+            # Try HTTPS first, then HTTP
+            for scheme in ['https', 'http']:
+                url = f"{scheme}://{self.target}"
+                try:
+                    async with async_playwright() as p:
+                        browser = await p.chromium.launch(headless=True)
+                        context = await browser.new_context(
+                            viewport={'width': 1280, 'height': 720},
+                            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                        )
+                        page = await context.new_page()
+
+                        # Navigate with timeout
+                        await page.goto(url, wait_until='networkidle', timeout=15000)
+
+                        # Take screenshot
+                        screenshot_bytes = await page.screenshot(full_page=False)
+
+                        # Convert to base64
+                        screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+
+                        result["success"] = True
+                        result["data"] = screenshot_base64
+                        result["url"] = url
+
+                        await browser.close()
+                        break
+
+                except Exception as e:
+                    self.logger.debug(f"Screenshot failed for {url}: {e}")
+                    continue
+
+            if not result["success"]:
+                result["error"] = "Unable to capture screenshot"
+
+        except Exception as e:
+            result["error"] = str(e)
+            self.logger.debug(f"Screenshot capture error: {e}")
 
         return result

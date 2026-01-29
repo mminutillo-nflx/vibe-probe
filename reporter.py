@@ -72,6 +72,14 @@ class ReportGenerator:
 
         summary = self._generate_summary()
 
+        # Extract screenshot from http probe if available
+        screenshot_data = None
+        http_probe_data = self.results.get("probes", {}).get("http", {})
+        if http_probe_data.get("status") == "success":
+            screenshot_info = http_probe_data.get("data", {}).get("screenshot", {})
+            if screenshot_info.get("success"):
+                screenshot_data = screenshot_info.get("data")
+
         html_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -523,6 +531,167 @@ class ReportGenerator:
             scroll-padding-top: 20px;
         }
 
+        /* Screenshot Section */
+        .screenshot-section {
+            background: var(--bg-card);
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+            border: 1px solid var(--border);
+        }
+
+        .screenshot-header {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            color: var(--text-primary);
+        }
+
+        .screenshot-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border);
+        }
+
+        .screenshot-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .screenshot-caption {
+            margin-top: 15px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .screenshot-unavailable {
+            padding: 60px 20px;
+            text-align: center;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 2px dashed var(--border);
+        }
+
+        .screenshot-unavailable-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        /* Advanced Mode Toggle */
+        .advanced-toggle-container {
+            background: var(--bg-card);
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .toggle-description {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            margin-left: 40px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: var(--border);
+            border-radius: 30px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: var(--primary);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(30px);
+        }
+
+        /* Advanced Data Section */
+        .advanced-data {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .advanced-data.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .advanced-data-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .advanced-data pre {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+            margin: 0;
+            color: #e0e0e0;
+        }
+
+        .advanced-data pre code {
+            color: inherit;
+        }
+
+        .no-data {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header h1 {
@@ -570,6 +739,50 @@ class ReportGenerator:
                 </div>
             </div>
         </div>
+
+        <!-- Advanced Mode Toggle -->
+        <div class="advanced-toggle-container">
+            <div>
+                <div class="toggle-label">
+                    <span>🔧</span>
+                    <span>Advanced Mode</span>
+                </div>
+                <div class="toggle-description">Show detailed technical data from probes</div>
+            </div>
+            <div class="toggle-switch" id="advancedToggle" onclick="toggleAdvancedMode()">
+                <div class="toggle-slider"></div>
+            </div>
+        </div>
+
+        <!-- Homepage Screenshot -->
+        {% if screenshot %}
+        <div class="screenshot-section">
+            <div class="screenshot-header">
+                <span>📸</span>
+                <span>Homepage Screenshot</span>
+            </div>
+            <div class="screenshot-container">
+                <img src="data:image/png;base64,{{ screenshot }}" alt="Homepage Screenshot">
+            </div>
+            <div class="screenshot-caption">
+                Captured at scan time: {{ scan_time }}
+            </div>
+        </div>
+        {% else %}
+        <div class="screenshot-section">
+            <div class="screenshot-header">
+                <span>📸</span>
+                <span>Homepage Screenshot</span>
+            </div>
+            <div class="screenshot-unavailable">
+                <div class="screenshot-unavailable-icon">🚫</div>
+                <div>Screenshot unavailable</div>
+                <div style="font-size: 0.85em; margin-top: 10px;">
+                    Install playwright for screenshot capture: pip install playwright && playwright install chromium
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- Executive Summary -->
         <div class="summary">
@@ -647,6 +860,15 @@ class ReportGenerator:
                         </div>
                     </div>
                     {% endif %}
+                    {% if finding.data %}
+                    <div class="advanced-data">
+                        <div class="advanced-data-header">
+                            <span>🔍</span>
+                            <span>Technical Details</span>
+                        </div>
+                        <pre><code>{{ finding.data | tojson(indent=2) }}</code></pre>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
@@ -666,6 +888,34 @@ class ReportGenerator:
     </div>
 
     <script>
+        // Advanced Mode Toggle
+        function toggleAdvancedMode() {
+            const toggle = document.getElementById('advancedToggle');
+            const advancedSections = document.querySelectorAll('.advanced-data');
+
+            toggle.classList.toggle('active');
+            const isActive = toggle.classList.contains('active');
+
+            advancedSections.forEach(section => {
+                if (isActive) {
+                    section.classList.add('show');
+                } else {
+                    section.classList.remove('show');
+                }
+            });
+
+            // Save preference to localStorage
+            localStorage.setItem('advancedMode', isActive ? 'true' : 'false');
+        }
+
+        // Restore advanced mode preference on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const savedMode = localStorage.getItem('advancedMode');
+            if (savedMode === 'true') {
+                document.getElementById('advancedToggle').click();
+            }
+        });
+
         // Scroll progress bar
         window.addEventListener('scroll', function() {
             const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
@@ -717,7 +967,8 @@ class ReportGenerator:
             scan_time=self.results["scan_time"],
             generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
             summary=summary,
-            findings=self.organized_findings
+            findings=self.organized_findings,
+            screenshot=screenshot_data
         )
 
         with open(output_file, 'w') as f:
