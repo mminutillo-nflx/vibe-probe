@@ -224,12 +224,19 @@ class ReportGenerator:
             overflow: hidden;
             transition: all 0.3s ease;
             cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
         }
 
         .summary-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
             border-color: var(--primary);
+        }
+
+        .summary-card:active {
+            transform: translateY(-3px);
         }
 
         .summary-card::before {
@@ -510,6 +517,12 @@ class ReportGenerator:
             transition: width 0.1s ease;
         }
 
+        /* Smooth scroll target offset for fixed header */
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 20px;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header h1 {
@@ -561,43 +574,43 @@ class ReportGenerator:
         <!-- Executive Summary -->
         <div class="summary">
             <div class="summary-grid">
-                <div class="summary-card critical">
+                <a href="#critical-findings" class="summary-card critical">
                     <div class="summary-icon">🔴</div>
                     <div class="summary-number">{{ summary.critical_count }}</div>
                     <div class="summary-label">Critical Issues</div>
-                </div>
-                <div class="summary-card high">
+                </a>
+                <a href="#high-findings" class="summary-card high">
                     <div class="summary-icon">🟠</div>
                     <div class="summary-number">{{ summary.high_count }}</div>
                     <div class="summary-label">High Priority</div>
-                </div>
-                <div class="summary-card medium">
+                </a>
+                <a href="#medium-findings" class="summary-card medium">
                     <div class="summary-icon">🟡</div>
                     <div class="summary-number">{{ summary.medium_count }}</div>
                     <div class="summary-label">Medium Priority</div>
-                </div>
-                <div class="summary-card low">
+                </a>
+                <a href="#low-findings" class="summary-card low">
                     <div class="summary-icon">🔵</div>
                     <div class="summary-number">{{ summary.low_count }}</div>
                     <div class="summary-label">Low Priority</div>
-                </div>
-                <div class="summary-card">
+                </a>
+                <a href="#info-findings" class="summary-card">
                     <div class="summary-icon">⚪</div>
                     <div class="summary-number">{{ summary.info_count }}</div>
                     <div class="summary-label">Informational</div>
-                </div>
-                <div class="summary-card">
+                </a>
+                <a href="#critical-findings" class="summary-card">
                     <div class="summary-icon">📊</div>
                     <div class="summary-number">{{ summary.total_findings }}</div>
                     <div class="summary-label">Total Findings</div>
-                </div>
+                </a>
             </div>
         </div>
 
         <!-- Findings -->
         {% for severity in ['critical', 'high', 'medium', 'low', 'info'] %}
             {% if findings[severity]|length > 0 %}
-            <div class="findings-section">
+            <div id="{{ severity }}-findings" class="findings-section">
                 <div class="section-header">
                     <div class="section-title">
                         {% if severity == 'critical' %}
