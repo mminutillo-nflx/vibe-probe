@@ -39,6 +39,57 @@ from utils.logger import setup_logger
 __version__ = "1.0.0"
 
 
+def check_first_run_warning() -> bool:
+    """Check if user has confirmed OSINT tool usage warning"""
+    warning_file = Path.home() / ".vibe-probe-confirmed"
+    return warning_file.exists()
+
+
+def show_first_run_warning() -> bool:
+    """Display first-run warning and get user confirmation"""
+    print("\n" + "="*70)
+    print("⚠️  IMPORTANT: OSINT TOOL USAGE WARNING")
+    print("="*70)
+    print("""
+This tool performs automated reconnaissance and information gathering.
+
+CRITICAL WARNINGS:
+• Only use on domains you own or have explicit permission to test
+• OSINT activities may be logged and monitored by target systems
+• Some probes may trigger security alerts or rate limits
+• Improper use may violate laws, terms of service, or ethical guidelines
+
+📖 Please read the README.md for detailed warnings about:
+   - Legal considerations and authorization requirements
+   - OPSEC (Operational Security) best practices
+   - API key security and rate limits
+   - Network fingerprinting and detection risks
+   - Data handling and privacy considerations
+
+By continuing, you acknowledge:
+✓ You have read and understand these warnings
+✓ You will use this tool responsibly and ethically
+✓ You accept full responsibility for your actions
+""")
+    print("="*70)
+
+    while True:
+        response = input("\nDo you understand and accept these risks? (yes/no): ").strip().lower()
+
+        if response in ['yes', 'y']:
+            # Create confirmation file
+            warning_file = Path.home() / ".vibe-probe-confirmed"
+            warning_file.touch()
+            print("\n✓ Confirmation recorded. You will not be asked again.")
+            print("  (To see this warning again, delete: ~/.vibe-probe-confirmed)\n")
+            return True
+        elif response in ['no', 'n']:
+            print("\n✗ Tool usage declined. Exiting.")
+            return False
+        else:
+            print("Please answer 'yes' or 'no'")
+
+
 class VibeProbe:
     """Main OSINT reconnaissance orchestrator"""
 
@@ -167,6 +218,11 @@ Examples:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     args = parser.parse_args()
+
+    # Check for first-run warning
+    if not check_first_run_warning():
+        if not show_first_run_warning():
+            sys.exit(0)
 
     # Load configuration
     config = Config(args.config, args)
