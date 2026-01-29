@@ -240,14 +240,108 @@ git ls-files | grep -E '(\.env$|config\.yaml)'
 # Should only show .env.example and config.example.yaml
 ```
 
-### Tool Usage Security
+### OSINT Tool Usage Warnings
+
+#### ⚖️ Legal Considerations
+
+**READ THIS CAREFULLY BEFORE USE**
+
+1. **Authorization is MANDATORY**
+   - Only scan domains you own or have explicit written permission to test
+   - Unauthorized scanning may violate:
+     - Computer Fraud and Abuse Act (CFAA) in the USA
+     - Computer Misuse Act in the UK
+     - GDPR and data protection laws in the EU
+     - Similar laws worldwide
+   - Penalties can include fines and criminal prosecution
+
+2. **Terms of Service Violations**
+   - Many services explicitly prohibit automated scanning
+   - API usage may violate ToS if used for reconnaissance
+   - Some third-party services (Shodan, VirusTotal, etc.) have usage limits and restrictions
+   - **You are responsible for complying with all applicable ToS**
+
+3. **Professional Boundaries**
+   - Get a written scope of work for professional engagements
+   - Document authorization before testing
+   - Follow responsible disclosure practices
+
+#### 🕵️ Operational Security (OPSEC) Considerations
+
+**Your reconnaissance activities are NOT invisible**
+
+1. **You Will Be Detected**
+   - Port scans leave obvious traces in logs
+   - Multiple DNS queries can trigger alerts
+   - Repeated HTTP requests show patterns
+   - Security teams monitor for reconnaissance
+   - Your IP address will be logged everywhere
+
+2. **Attribution Risks**
+   - Running from your home/work IP exposes your identity
+   - ISPs may receive abuse complaints
+   - Corporate networks may have policies against scanning
+   - Your activity may be correlated across multiple targets
+
+3. **OPSEC Best Practices**
+   - ⚠️ **Never scan from your personal/work IP without authorization**
+   - Use authorized testing environments or ranges
+   - Consider rate limiting (built into this tool)
+   - Be aware that VPNs/proxies may also log your activity
+   - Document your authorization before starting
+
+4. **Unintended Consequences**
+   - Aggressive scanning can cause service disruptions
+   - May trigger automated blocking (IP bans, rate limits)
+   - Could impact legitimate business operations
+   - May damage professional relationships
+
+#### 🎯 Responsible Use Guidelines
+
+1. **Before Scanning**
+   - [ ] Obtain written authorization
+   - [ ] Define scope boundaries clearly
+   - [ ] Review applicable laws in your jurisdiction
+   - [ ] Check Terms of Service for all APIs used
+   - [ ] Ensure you're not on a production network without permission
+
+2. **During Scanning**
+   - Use reasonable rate limits (default settings are conservative)
+   - Stop immediately if you detect problems
+   - Respect robots.txt and security.txt
+   - Monitor for unintended side effects
+
+3. **After Scanning**
+   - Store reports securely (they contain sensitive data)
+   - Share findings only with authorized parties
+   - Follow responsible disclosure if vulnerabilities found
+   - Delete sensitive data when no longer needed
+
+#### 🚨 Red Flags - STOP If Any Apply
+
+- ❌ You don't have written authorization
+- ❌ You're "just curious" about a domain you don't own
+- ❌ You're testing a competitor without permission
+- ❌ You're scanning from a network you don't control
+- ❌ You're trying to circumvent security measures
+- ❌ You plan to use findings for malicious purposes
+
+#### ✅ Legitimate Use Cases
+
+- ✅ Your own infrastructure and domains
+- ✅ Authorized penetration testing engagements
+- ✅ Bug bounty programs (follow program rules!)
+- ✅ Security research with proper authorization
+- ✅ Educational purposes in controlled environments
+
+### Tool-Specific Security Notes
 
 - **Defensive Use Only**: This tool is designed for security research and authorized testing only
-- **Authorization Required**: Ensure you have explicit authorization before scanning any target
-- **Rate Limiting**: Respects rate limits and implements delays
-- **Legal Compliance**: Unauthorized scanning may violate laws (CFAA, GDPR, etc.)
+- **Rate Limiting**: Built-in delays to be a good netizen, but still creates detectable patterns
 - **Data Protection**: Reports may contain sensitive information - store securely
-- **Network Exposure**: Some probes may trigger security alerts on target networks
+- **Network Exposure**: Some probes WILL trigger security alerts on target networks
+- **API Quotas**: Be aware of rate limits on third-party services (Shodan, VirusTotal, etc.)
+- **Logging**: Assume all your activities are being logged by target systems
 
 ## Requirements
 
