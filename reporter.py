@@ -77,6 +77,135 @@ class ReportGenerator:
 
         return probe_status
 
+    def _analyze_tech_stack(self) -> Dict[str, Any]:
+        """Analyze probe results to determine technology stack"""
+        tech_stack = {
+            "web_server": {"detected": [], "evidence": [], "unknown": False},
+            "backend": {"detected": [], "evidence": [], "unknown": False},
+            "frontend": {"detected": [], "evidence": [], "unknown": False},
+            "database": {"detected": [], "evidence": [], "unknown": False},
+            "cdn": {"detected": [], "evidence": [], "unknown": False},
+            "security": {"detected": [], "evidence": [], "unknown": False},
+            "ssl_tls": {"detected": [], "evidence": [], "unknown": False},
+            "hosting": {"detected": [], "evidence": [], "unknown": False},
+            "email": {"detected": [], "evidence": [], "unknown": False},
+        }
+
+        # Analyze HTTP probe results
+        http_data = self.results.get("probes", {}).get("http", {}).get("data", {})
+        if http_data:
+            headers = http_data.get("headers", {})
+
+            # Web server detection
+            if "server" in headers:
+                tech_stack["web_server"]["detected"].append(headers["server"])
+                tech_stack["web_server"]["evidence"].append(f"Server header: {headers['server']}")
+
+            # Backend technology hints
+            if "x-powered-by" in headers:
+                tech_stack["backend"]["detected"].append(headers["x-powered-by"])
+                tech_stack["backend"]["evidence"].append(f"X-Powered-By header: {headers['x-powered-by']}")
+
+            # CDN detection
+            cdn_headers = ["cf-ray", "x-amz-cf-id", "x-akamai-transformed", "x-fastly-request-id"]
+            for cdn_header in cdn_headers:
+                if cdn_header in headers:
+                    if "cf-ray" in cdn_header:
+                        tech_stack["cdn"]["detected"].append("Cloudflare")
+                    elif "x-amz-cf-id" in cdn_header:
+                        tech_stack["cdn"]["detected"].append("Amazon CloudFront")
+                    elif "x-akamai" in cdn_header:
+                        tech_stack["cdn"]["detected"].append("Akamai")
+                    elif "x-fastly" in cdn_header:
+                        tech_stack["cdn"]["detected"].append("Fastly")
+                    tech_stack["cdn"]["evidence"].append(f"CDN header detected: {cdn_header}")
+
+        # Analyze SSL probe results
+        ssl_data = self.results.get("probes", {}).get("ssl", {}).get("data", {})
+        if ssl_data:
+            tls_version = ssl_data.get("tls_version")
+            cipher = ssl_data.get("cipher")
+            issuer = ssl_data.get("issuer")
+
+            if tls_version:
+                tech_stack["ssl_tls"]["detected"].append(f"TLS Version: {tls_version}")
+                tech_stack["ssl_tls"]["evidence"].append(f"TLS protocol: {tls_version}")
+
+            if cipher:
+                tech_stack["ssl_tls"]["detected"].append(f"Cipher: {cipher}")
+                tech_stack["ssl_tls"]["evidence"].append(f"Cipher suite: {cipher}")
+
+            if issuer:
+                tech_stack["ssl_tls"]["detected"].append(f"Certificate Issuer: {issuer}")
+                tech_stack["ssl_tls"]["evidence"].append(f"SSL certificate issued by: {issuer}")
+
+        # Analyze DNS probe results for hosting
+        dns_data = self.results.get("probes", {}).get("dns", {}).get("data", {})
+        if dns_data:
+            a_records = dns_data.get("A", [])
+            ns_records = dns_data.get("NS", [])
+            mx_records = dns_data.get("MX", [])
+
+            if a_records:
+                tech_stack["hosting"]["evidence"].append(f"A records point to: {', '.join(a_records)}")
+
+            if ns_records:
+                ns_providers = ', '.join(ns_records)
+                tech_stack["hosting"]["detected"].append(f"Nameservers: {ns_providers}")
+                tech_stack["hosting"]["evidence"].append(f"DNS managed by: {ns_providers}")
+
+            if mx_records:
+                for mx in mx_records:
+                    tech_stack["email"]["detected"].append(mx)
+                    tech_stack["email"]["evidence"].append(f"MX record: {mx}")
+
+                    # Detect common email providers
+                    if "google" in mx.lower():
+                        tech_stack["email"]["detected"].append("Google Workspace / Gmail")
+                    elif "outlook" in mx.lower() or "office365" in mx.lower():
+                        tech_stack["email"]["detected"].append("Microsoft 365")
+                    elif "proofpoint" in mx.lower():
+                        tech_stack["security"]["detected"].append("Proofpoint Email Security")
+
+        # Analyze security headers
+        security_headers_data = self.results.get("probes", {}).get("security_headers", {}).get("data", {})
+        if security_headers_data:
+            headers_present = security_headers_data.get("headers_present", {})
+
+            waf_headers = ["x-waf", "x-sucuri-id", "x-cdn"]
+            for header, value in headers_present.items():
+                if any(waf in header.lower() for waf in waf_headers):
+                    tech_stack["security"]["detected"].append(f"WAF/Security: {header}")
+                    tech_stack["security"]["evidence"].append(f"Security header: {header}: {value}")
+
+        # Analyze port scan results
+        port_data = self.results.get("probes", {}).get("port", {}).get("data", {})
+        if port_data:
+            open_ports = port_data.get("open_ports", [])
+            for port_info in open_ports:
+                port = port_info.get("port")
+                service = port_info.get("service", "Unknown")
+
+                if port == 3306:
+                    tech_stack["database"]["detected"].append("MySQL")
+                    tech_stack["database"]["evidence"].append("Port 3306 open (MySQL)")
+                elif port == 5432:
+                    tech_stack["database"]["detected"].append("PostgreSQL")
+                    tech_stack["database"]["evidence"].append("Port 5432 open (PostgreSQL)")
+                elif port == 27017:
+                    tech_stack["database"]["detected"].append("MongoDB")
+                    tech_stack["database"]["evidence"].append("Port 27017 open (MongoDB)")
+                elif port == 6379:
+                    tech_stack["database"]["detected"].append("Redis")
+                    tech_stack["database"]["evidence"].append("Port 6379 open (Redis)")
+
+        # Mark sections as unknown if no data collected
+        for category, data in tech_stack.items():
+            if not data["detected"] and not data["evidence"]:
+                data["unknown"] = True
+
+        return tech_stack
+
     def generate_json(self, output_dir: Path) -> Path:
         """Generate JSON report"""
         output_file = output_dir / "report.json"
@@ -104,6 +233,7 @@ class ReportGenerator:
 
         summary = self._generate_summary()
         probe_status = self._organize_probe_status()
+        tech_stack = self._analyze_tech_stack()
 
         # Extract screenshot from http probe if available
         screenshot_data = None
@@ -153,7 +283,7 @@ class ReportGenerator:
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 40px 20px;
         }
@@ -195,6 +325,44 @@ class ReportGenerator:
             font-weight: 600;
         }
 
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .tab.active {
+            color: var(--primary-light);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         /* Summary Cards */
         .summary {
             margin-bottom: 30px;
@@ -212,14 +380,6 @@ class ReportGenerator:
             border-radius: 12px;
             text-align: center;
             border: 1px solid var(--border);
-            text-decoration: none;
-            color: inherit;
-            display: block;
-            transition: border-color 0.2s;
-        }
-
-        .summary-card:hover {
-            border-color: var(--primary);
         }
 
         .summary-number {
@@ -242,7 +402,7 @@ class ReportGenerator:
             letter-spacing: 0.5px;
         }
 
-        /* Toggle Section */
+        /* Toggle Switch */
         .toggle-section {
             background: var(--bg-card);
             padding: 20px;
@@ -267,27 +427,6 @@ class ReportGenerator:
             gap: 10px;
         }
 
-        .toggle-icon {
-            font-size: 1.5em;
-            transition: transform 0.2s;
-        }
-
-        .toggle-icon.open {
-            transform: rotate(90deg);
-        }
-
-        .toggle-content {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-        }
-
-        .toggle-content.show {
-            max-height: 2000px;
-            margin-top: 20px;
-        }
-
-        /* Toggle Switch */
         .toggle-switch {
             position: relative;
             width: 56px;
@@ -322,6 +461,7 @@ class ReportGenerator:
         .probe-list {
             display: grid;
             gap: 12px;
+            margin-bottom: 30px;
         }
 
         .probe-item {
@@ -535,6 +675,105 @@ class ReportGenerator:
             margin: 0;
         }
 
+        /* Tech Stack */
+        .tech-stack-section {
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .tech-category {
+            margin-bottom: 30px;
+        }
+
+        .tech-category-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: var(--primary-light);
+        }
+
+        .tech-detected {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--success);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .tech-unknown {
+            background: rgba(107, 114, 128, 0.1);
+            border-left: 3px solid var(--info);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            color: var(--text-secondary);
+        }
+
+        .tech-item {
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .tech-evidence {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .tech-evidence-title {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: var(--primary-light);
+            margin-bottom: 8px;
+        }
+
+        .tech-evidence-item {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+            padding-left: 16px;
+        }
+
+        .tech-evidence-item::before {
+            content: "→ ";
+            color: var(--primary);
+        }
+
+        /* Raw Data Section */
+        .raw-data-section {
+            background: var(--bg-card);
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+        }
+
+        .raw-data-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .raw-data-content {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .raw-data-content pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+            color: #e0e0e0;
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -554,8 +793,16 @@ class ReportGenerator:
                 grid-template-columns: repeat(2, 1fr);
             }
 
-            .findings-section {
+            .findings-section, .tech-stack-section {
                 padding: 20px;
+            }
+
+            .tabs {
+                overflow-x: auto;
+            }
+
+            .tab {
+                white-space: nowrap;
             }
         }
     </style>
@@ -581,46 +828,133 @@ class ReportGenerator:
             </div>
         </div>
 
-        <!-- Summary -->
-        <div class="summary">
-            <div class="summary-grid">
-                <a href="#critical-findings" class="summary-card critical">
-                    <div class="summary-number">{{ summary.critical_count }}</div>
-                    <div class="summary-label">Critical</div>
-                </a>
-                <a href="#high-findings" class="summary-card high">
-                    <div class="summary-number">{{ summary.high_count }}</div>
-                    <div class="summary-label">High</div>
-                </a>
-                <a href="#medium-findings" class="summary-card medium">
-                    <div class="summary-number">{{ summary.medium_count }}</div>
-                    <div class="summary-label">Medium</div>
-                </a>
-                <a href="#low-findings" class="summary-card low">
-                    <div class="summary-number">{{ summary.low_count }}</div>
-                    <div class="summary-label">Low</div>
-                </a>
-                <a href="#info-findings" class="summary-card">
-                    <div class="summary-number">{{ summary.info_count }}</div>
-                    <div class="summary-label">Info</div>
-                </a>
-                <a href="#critical-findings" class="summary-card">
-                    <div class="summary-number">{{ summary.total_findings }}</div>
-                    <div class="summary-label">Total</div>
-                </a>
-            </div>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('findings')">📊 Report Summary</button>
+            <button class="tab" onclick="switchTab('output')">📝 Script Output</button>
+            <button class="tab" onclick="switchTab('architecture')">🏗️ Technical Architecture</button>
         </div>
 
-        <!-- Probe Execution Status -->
-        <div class="toggle-section">
-            <div class="toggle-header" onclick="toggleSection('probe-status')">
-                <div class="toggle-title">
-                    <span>⚙️</span>
-                    <span>Probe Execution Status</span>
+        <!-- Tab 1: Findings -->
+        <div id="findings-tab" class="tab-content active">
+            <!-- Summary -->
+            <div class="summary">
+                <div class="summary-grid">
+                    <div class="summary-card critical">
+                        <div class="summary-number">{{ summary.critical_count }}</div>
+                        <div class="summary-label">Critical</div>
+                    </div>
+                    <div class="summary-card high">
+                        <div class="summary-number">{{ summary.high_count }}</div>
+                        <div class="summary-label">High</div>
+                    </div>
+                    <div class="summary-card medium">
+                        <div class="summary-number">{{ summary.medium_count }}</div>
+                        <div class="summary-label">Medium</div>
+                    </div>
+                    <div class="summary-card low">
+                        <div class="summary-number">{{ summary.low_count }}</div>
+                        <div class="summary-label">Low</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number">{{ summary.info_count }}</div>
+                        <div class="summary-label">Info</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-number">{{ summary.total_findings }}</div>
+                        <div class="summary-label">Total</div>
+                    </div>
                 </div>
-                <div class="toggle-icon" id="probe-status-icon">▶</div>
             </div>
-            <div class="toggle-content" id="probe-status-content">
+
+            <!-- Advanced Mode Toggle -->
+            <div class="toggle-section">
+                <div class="toggle-header" onclick="toggleAdvancedMode()" style="cursor: pointer;">
+                    <div class="toggle-title">
+                        <span>🔧</span>
+                        <span>Advanced Mode - Show Technical Details</span>
+                    </div>
+                    <div class="toggle-switch" id="advanced-mode-switch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Screenshot -->
+            {% if screenshot %}
+            <div class="screenshot-section">
+                <div class="screenshot-header">📸 Homepage Screenshot</div>
+                <div class="screenshot-container">
+                    <img src="data:image/png;base64,{{ screenshot }}" alt="Homepage Screenshot">
+                </div>
+            </div>
+            {% else %}
+            <div class="screenshot-section">
+                <div class="screenshot-header">📸 Homepage Screenshot</div>
+                <div class="screenshot-unavailable">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🚫</div>
+                    <div>Screenshot unavailable</div>
+                    <div style="font-size: 0.85em; margin-top: 8px; opacity: 0.7;">
+                        Install playwright: pip install playwright && playwright install chromium
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Findings -->
+            {% for severity in ['critical', 'high', 'medium', 'low', 'info'] %}
+                {% if findings[severity]|length > 0 %}
+                <div class="findings-section">
+                    <div class="section-header">
+                        <div class="section-title">
+                            {% if severity == 'critical' %}
+                                🔴 Critical Findings
+                            {% elif severity == 'high' %}
+                                🟠 High Priority
+                            {% elif severity == 'medium' %}
+                                🟡 Medium Priority
+                            {% elif severity == 'low' %}
+                                🔵 Low Priority
+                            {% else %}
+                                ⚪ Informational
+                            {% endif %}
+                        </div>
+                        <span class="section-count">{{ findings[severity]|length }}</span>
+                    </div>
+
+                    {% for finding in findings[severity] %}
+                    <div class="finding {{ severity }}">
+                        <div class="finding-header">
+                            <span class="severity-badge {{ severity }}">{{ severity }}</span>
+                            <span class="finding-title">{{ finding.title }}</span>
+                            <span class="probe-badge">{{ finding.probe }}</span>
+                        </div>
+                        <div class="finding-description">{{ finding.description }}</div>
+                        {% if finding.recommendation %}
+                        <div class="finding-recommendation">
+                            <div class="recommendation-label">💡 Recommendation</div>
+                            <div>{{ finding.recommendation }}</div>
+                        </div>
+                        {% endif %}
+                        {% if finding.data %}
+                        <div class="advanced-data">
+                            <pre><code>{{ finding.data | tojson(indent=2) }}</code></pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Tab 2: Script Output -->
+        <div id="output-tab" class="tab-content">
+            <div class="findings-section">
+                <div class="section-header">
+                    <div class="section-title">⚙️ Probe Execution Status</div>
+                </div>
+
                 {% if probe_status.successful %}
                 <h3 style="color: var(--success); margin-bottom: 12px;">✓ Successful ({{ probe_status.successful|length }})</h3>
                 <div class="probe-list">
@@ -663,87 +997,211 @@ class ReportGenerator:
                 </div>
                 {% endif %}
             </div>
-        </div>
 
-        <!-- Advanced Mode Toggle -->
-        <div class="toggle-section">
-            <div class="toggle-header" onclick="toggleAdvancedMode()" style="cursor: pointer;">
-                <div class="toggle-title">
-                    <span>🔧</span>
-                    <span>Advanced Mode - Show Technical Details</span>
-                </div>
-                <div class="toggle-switch" id="advanced-mode-switch">
-                    <div class="toggle-slider"></div>
+            <div class="raw-data-section">
+                <div class="raw-data-title">📄 Raw Probe Results</div>
+                <div class="raw-data-content">
+                    <pre>{{ probes_data | tojson(indent=2) }}</pre>
                 </div>
             </div>
         </div>
 
-        <!-- Screenshot -->
-        {% if screenshot %}
-        <div class="screenshot-section">
-            <div class="screenshot-header">📸 Homepage Screenshot</div>
-            <div class="screenshot-container">
-                <img src="data:image/png;base64,{{ screenshot }}" alt="Homepage Screenshot">
-            </div>
-        </div>
-        {% else %}
-        <div class="screenshot-section">
-            <div class="screenshot-header">📸 Homepage Screenshot</div>
-            <div class="screenshot-unavailable">
-                <div style="font-size: 2em; margin-bottom: 10px;">🚫</div>
-                <div>Screenshot unavailable</div>
-                <div style="font-size: 0.85em; margin-top: 8px; opacity: 0.7;">
-                    Install playwright: pip install playwright && playwright install chromium
-                </div>
-            </div>
-        </div>
-        {% endif %}
-
-        <!-- Findings -->
-        {% for severity in ['critical', 'high', 'medium', 'low', 'info'] %}
-            {% if findings[severity]|length > 0 %}
-            <div id="{{ severity }}-findings" class="findings-section">
+        <!-- Tab 3: Technical Architecture -->
+        <div id="architecture-tab" class="tab-content">
+            <div class="tech-stack-section">
                 <div class="section-header">
-                    <div class="section-title">
-                        {% if severity == 'critical' %}
-                            🔴 Critical Findings
-                        {% elif severity == 'high' %}
-                            🟠 High Priority
-                        {% elif severity == 'medium' %}
-                            🟡 Medium Priority
-                        {% elif severity == 'low' %}
-                            🔵 Low Priority
-                        {% else %}
-                            ⚪ Informational
-                        {% endif %}
-                    </div>
-                    <span class="section-count">{{ findings[severity]|length }}</span>
+                    <div class="section-title">🏗️ Technical Architecture Analysis</div>
                 </div>
 
-                {% for finding in findings[severity] %}
-                <div class="finding {{ severity }}">
-                    <div class="finding-header">
-                        <span class="severity-badge {{ severity }}">{{ severity }}</span>
-                        <span class="finding-title">{{ finding.title }}</span>
-                        <span class="probe-badge">{{ finding.probe }}</span>
+                <p style="color: var(--text-secondary); margin-bottom: 30px; line-height: 1.8;">
+                    This analysis examines the technology stack powering <strong>{{ target }}</strong> based on reconnaissance data gathered by various probes. Each component identifies the technologies detected, the evidence supporting these determinations, and areas where the stack remains unknown or unknowable given current probe capabilities.
+                </p>
+
+                <!-- Web Server -->
+                <div class="tech-category">
+                    <div class="tech-category-title">🌐 Web Server</div>
+                    {% if tech_stack.web_server.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>Unable to determine web server technology. This could indicate the Server header is masked, removed for security, or the site uses a non-standard configuration.</em>
                     </div>
-                    <div class="finding-description">{{ finding.description }}</div>
-                    {% if finding.recommendation %}
-                    <div class="finding-recommendation">
-                        <div class="recommendation-label">💡 Recommendation</div>
-                        <div>{{ finding.recommendation }}</div>
-                    </div>
-                    {% endif %}
-                    {% if finding.data %}
-                    <div class="advanced-data">
-                        <pre><code>{{ finding.data | tojson(indent=2) }}</code></pre>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.web_server.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.web_server.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
                     </div>
                     {% endif %}
                 </div>
-                {% endfor %}
+
+                <!-- Backend -->
+                <div class="tech-category">
+                    <div class="tech-category-title">⚙️ Backend Framework/Language</div>
+                    {% if tech_stack.backend.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>Backend technology could not be determined from HTTP headers. Modern applications often hide backend details for security. Additional probes (e.g., technology fingerprinting, response analysis) would be needed.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.backend.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.backend.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Database -->
+                <div class="tech-category">
+                    <div class="tech-category-title">🗄️ Database</div>
+                    {% if tech_stack.database.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>No database ports detected open to the internet. This is expected and secure - databases should not be publicly accessible. Internal database technology cannot be determined externally.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.database.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.database.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- CDN -->
+                <div class="tech-category">
+                    <div class="tech-category-title">🌍 Content Delivery Network (CDN)</div>
+                    {% if tech_stack.cdn.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>No CDN detected. The site may be served directly from origin servers, use a CDN that doesn't add identifying headers, or rely on DNS-based load balancing.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.cdn.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.cdn.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- SSL/TLS -->
+                <div class="tech-category">
+                    <div class="tech-category-title">🔒 SSL/TLS Configuration</div>
+                    {% if tech_stack.ssl_tls.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>SSL/TLS information could not be gathered. The site may not support HTTPS, the SSL probe failed, or certificate details are not accessible.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.ssl_tls.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.ssl_tls.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Security -->
+                <div class="tech-category">
+                    <div class="tech-category-title">🛡️ Security Tools</div>
+                    {% if tech_stack.security.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>No explicit security tools detected via headers or fingerprints. This doesn't mean security measures aren't in place - many modern security tools operate transparently without advertising their presence.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.security.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.security.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Hosting -->
+                <div class="tech-category">
+                    <div class="tech-category-title">☁️ Hosting & Infrastructure</div>
+                    {% if tech_stack.hosting.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>Hosting provider could not be determined from DNS records alone. Additional analysis of IP ranges and ASN data would be needed to identify the infrastructure provider.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.hosting.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.hosting.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Email -->
+                <div class="tech-category">
+                    <div class="tech-category-title">📧 Email Infrastructure</div>
+                    {% if tech_stack.email.unknown %}
+                    <div class="tech-unknown">
+                        <strong>Status:</strong> Unknown<br>
+                        <em>No MX records found or DNS probe failed. The domain may not handle email, or email is configured through a parent domain.</em>
+                    </div>
+                    {% else %}
+                    <div class="tech-detected">
+                        {% for item in tech_stack.email.detected %}
+                        <div class="tech-item">{{ item }}</div>
+                        {% endfor %}
+                        <div class="tech-evidence">
+                            <div class="tech-evidence-title">Evidence:</div>
+                            {% for evidence in tech_stack.email.evidence %}
+                            <div class="tech-evidence-item">{{ evidence }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
-        {% endfor %}
+        </div>
 
         <!-- Footer -->
         <div class="footer">
@@ -753,17 +1211,21 @@ class ReportGenerator:
     </div>
 
     <script>
-        function toggleSection(sectionId) {
-            const content = document.getElementById(sectionId + '-content');
-            const icon = document.getElementById(sectionId + '-icon');
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
 
-            if (content.classList.contains('show')) {
-                content.classList.remove('show');
-                icon.classList.remove('open');
-            } else {
-                content.classList.add('show');
-                icon.classList.add('open');
-            }
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+
+            // Save preference
+            localStorage.setItem('activeTab', tabName);
         }
 
         function toggleAdvancedMode() {
@@ -790,17 +1252,14 @@ class ReportGenerator:
             if (savedMode === 'true') {
                 toggleAdvancedMode();
             }
-        });
 
-        // Smooth scroll
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({ behavior: 'smooth' });
+            const savedTab = localStorage.getItem('activeTab');
+            if (savedTab && savedTab !== 'findings') {
+                const tabButton = document.querySelector(`button.tab[onclick*="${savedTab}"]`);
+                if (tabButton) {
+                    tabButton.click();
                 }
-            });
+            }
         });
     </script>
 </body>
@@ -815,7 +1274,9 @@ class ReportGenerator:
             summary=summary,
             findings=self.organized_findings,
             screenshot=screenshot_data,
-            probe_status=probe_status
+            probe_status=probe_status,
+            tech_stack=tech_stack,
+            probes_data=self.results.get("probes", {})
         )
 
         with open(output_file, 'w') as f:
