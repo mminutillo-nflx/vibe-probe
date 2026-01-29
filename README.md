@@ -242,6 +242,8 @@ git ls-files | grep -E '(\.env$|config\.yaml)'
 
 ### OSINT Tool Usage Warnings
 
+> **⚠️ Disclaimer:** The author of this tool is not a lawyer. The following are general considerations based on common practices and known regulations. These are NOT legal advice. Use your own judgment, consult with legal counsel if needed, and when in doubt, proceed with caution or don't proceed at all.
+
 #### ⚖️ Legal Considerations
 
 **READ THIS CAREFULLY BEFORE USE**
