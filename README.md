@@ -2,6 +2,20 @@
 
 A comprehensive OSINT (Open Source Intelligence) reconnaissance tool for gathering intelligence on target domains. Vibe Probe combines technical probes with web intelligence to provide a complete security and reputation assessment.
 
+## ⚠️ Important Disclaimer
+
+**This is an experimental project created for learning and exploring Claude Code capabilities. It is NOT official Netflix tooling and should NOT be used for any real business purposes.**
+
+This repository is:
+- ✅ A personal learning experiment
+- ✅ An exploration of AI-assisted development with Claude Code
+- ✅ A proof-of-concept OSINT tool
+- ❌ NOT production-ready software
+- ❌ NOT endorsed by or affiliated with Netflix beyond being a personal project
+- ❌ NOT suitable for business-critical security assessments
+
+**Use at your own risk for educational purposes only.**
+
 ## Features
 
 ### Technical Reconnaissance
