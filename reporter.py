@@ -206,6 +206,86 @@ class ReportGenerator:
 
         return tech_stack
 
+    def _generate_architecture_diagram(self, tech_stack: Dict[str, Any]) -> str:
+        """Generate ASCII architecture diagram based on detected technologies"""
+
+        # Determine components
+        has_cdn = not tech_stack["cdn"]["unknown"]
+        has_webserver = not tech_stack["web_server"]["unknown"]
+        has_backend = not tech_stack["backend"]["unknown"]
+        has_database = not tech_stack["database"]["unknown"]
+        has_ssl = not tech_stack["ssl_tls"]["unknown"]
+
+        cdn_name = tech_stack["cdn"]["detected"][0] if has_cdn else "Unknown CDN"
+        webserver_name = tech_stack["web_server"]["detected"][0] if has_webserver else "Web Server"
+        backend_name = tech_stack["backend"]["detected"][0] if has_backend else "Backend"
+        database_name = tech_stack["database"]["detected"][0] if has_database else "Database"
+
+        # Build diagram
+        diagram = """
+┌─────────────────────────────────────────────────────────────────┐
+│                        System Architecture                      │
+│                         """ + self.results["target"] + """                         │
+└─────────────────────────────────────────────────────────────────┘
+
+        ┌──────────────┐
+        │   Internet   │
+        │    Users     │
+        └──────┬───────┘
+               │
+               │ HTTPS Request
+               │"""
+
+        if has_ssl:
+            ssl_info = tech_stack["ssl_tls"]["detected"][0] if tech_stack["ssl_tls"]["detected"] else "TLS"
+            diagram += f"\n               │ ({ssl_info})"
+
+        diagram += "\n               ▼\n"
+
+        if has_cdn:
+            diagram += f"""        ┌──────────────────┐
+        │   {cdn_name:^16} │
+        │   (CDN Layer)    │
+        └────────┬─────────┘
+                 │
+                 │ Cache/Forward
+                 ▼
+"""
+
+        diagram += f"""        ┌──────────────────┐
+        │   {webserver_name:^16} │
+        │  (Web Server)    │
+        └────────┬─────────┘
+                 │
+                 │ Process Request
+                 ▼
+        ┌──────────────────┐
+        │   {backend_name:^16} │
+        │  (Application)   │
+        └────────┬─────────┘
+"""
+
+        if has_database:
+            diagram += f"""                 │
+                 │ Query/Store
+                 ▼
+        ┌──────────────────┐
+        │   {database_name:^16} │
+        │    (Database)    │
+        └──────────────────┘
+"""
+        else:
+            diagram += f"""                 │
+                 │ [No Database Detected]
+                 ▼
+        ┌──────────────────┐
+        │ Static/Serverless│
+        │   Architecture   │
+        └──────────────────┘
+"""
+
+        return diagram
+
     def generate_json(self, output_dir: Path) -> Path:
         """Generate JSON report"""
         output_file = output_dir / "report.json"
@@ -234,6 +314,7 @@ class ReportGenerator:
         summary = self._generate_summary()
         probe_status = self._organize_probe_status()
         tech_stack = self._analyze_tech_stack()
+        architecture_diagram = self._generate_architecture_diagram(tech_stack)
 
         # Extract screenshot from http probe if available
         screenshot_data = None
@@ -411,6 +492,13 @@ class ReportGenerator:
             border: 1px solid var(--border);
         }
 
+        .toggle-section.sticky {
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
         .toggle-header {
             display: flex;
             align-items: center;
@@ -425,6 +513,25 @@ class ReportGenerator:
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+
+        .toggle-icon {
+            font-size: 1.5em;
+            transition: transform 0.2s;
+        }
+
+        .toggle-icon.open {
+            transform: rotate(90deg);
+        }
+
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .collapsible-content.show {
+            max-height: 5000px;
         }
 
         .toggle-switch {
@@ -774,6 +881,39 @@ class ReportGenerator:
             color: #e0e0e0;
         }
 
+        /* Architecture Diagram */
+        .diagram-section {
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border: 1px solid var(--border);
+        }
+
+        .diagram-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--primary-light);
+        }
+
+        .diagram-container {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 24px;
+            border-radius: 12px;
+            overflow-x: auto;
+            border: 2px solid var(--primary);
+        }
+
+        .diagram-container pre {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+            color: var(--text-primary);
+            white-space: pre;
+        }
+
         /* Footer */
         .footer {
             text-align: center;
@@ -868,7 +1008,7 @@ class ReportGenerator:
             </div>
 
             <!-- Advanced Mode Toggle -->
-            <div class="toggle-section">
+            <div class="toggle-section sticky">
                 <div class="toggle-header" onclick="toggleAdvancedMode()" style="cursor: pointer;">
                     <div class="toggle-title">
                         <span>🔧</span>
@@ -998,11 +1138,32 @@ class ReportGenerator:
                 {% endif %}
             </div>
 
-            <div class="raw-data-section">
-                <div class="raw-data-title">📄 Raw Probe Results</div>
-                <div class="raw-data-content">
-                    <pre>{{ probes_data | tojson(indent=2) }}</pre>
+            <div class="findings-section">
+                <div class="section-header">
+                    <div class="section-title">📄 Individual Probe Results</div>
                 </div>
+
+                {% for probe_name, probe_data in probes_data.items() %}
+                <div class="toggle-section" style="margin-bottom: 16px;">
+                    <div class="toggle-header" onclick="toggleProbe('{{ probe_name }}')">
+                        <div class="toggle-title" style="font-size: 1em;">
+                            <span>📦</span>
+                            <span>{{ probe_name }}</span>
+                            <span class="probe-status {{ probe_data.get('status', 'unknown') }}" style="margin-left: 12px;">
+                                {{ probe_data.get('status', 'unknown') }}
+                            </span>
+                        </div>
+                        <div class="toggle-icon" id="{{ probe_name }}-icon">▶</div>
+                    </div>
+                    <div class="collapsible-content" id="{{ probe_name }}-content">
+                        <div style="margin-top: 16px;">
+                            <div class="raw-data-content">
+                                <pre>{{ probe_data | tojson(indent=2) }}</pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
 
@@ -1016,7 +1177,17 @@ class ReportGenerator:
                 <p style="color: var(--text-secondary); margin-bottom: 30px; line-height: 1.8;">
                     This analysis examines the technology stack powering <strong>{{ target }}</strong> based on reconnaissance data gathered by various probes. Each component identifies the technologies detected, the evidence supporting these determinations, and areas where the stack remains unknown or unknowable given current probe capabilities.
                 </p>
+            </div>
 
+            <!-- Architecture Diagram -->
+            <div class="diagram-section">
+                <div class="diagram-title">📐 System Architecture Diagram</div>
+                <div class="diagram-container">
+                    <pre>{{ architecture_diagram }}</pre>
+                </div>
+            </div>
+
+            <div class="tech-stack-section">
                 <!-- Web Server -->
                 <div class="tech-category">
                     <div class="tech-category-title">🌐 Web Server</div>
@@ -1246,6 +1417,19 @@ class ReportGenerator:
             localStorage.setItem('advancedMode', isActive ? 'true' : 'false');
         }
 
+        function toggleProbe(probeName) {
+            const content = document.getElementById(probeName + '-content');
+            const icon = document.getElementById(probeName + '-icon');
+
+            if (content.classList.contains('show')) {
+                content.classList.remove('show');
+                icon.classList.remove('open');
+            } else {
+                content.classList.add('show');
+                icon.classList.add('open');
+            }
+        }
+
         // Restore preferences
         window.addEventListener('DOMContentLoaded', function() {
             const savedMode = localStorage.getItem('advancedMode');
@@ -1276,7 +1460,8 @@ class ReportGenerator:
             screenshot=screenshot_data,
             probe_status=probe_status,
             tech_stack=tech_stack,
-            probes_data=self.results.get("probes", {})
+            probes_data=self.results.get("probes", {}),
+            architecture_diagram=architecture_diagram
         )
 
         with open(output_file, 'w') as f:
