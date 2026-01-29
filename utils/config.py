@@ -89,5 +89,14 @@ class Config:
 
     def get_api_key(self, service: str) -> Optional[str]:
         """Get API key for a service"""
-        key_name = f"{service.lower()}_api_key"
+        service = service.lower()
+
+        # Special cases for services with non-standard key names
+        key_mappings = {
+            'github': 'github_token',
+            'twitter': 'twitter_bearer_token',
+        }
+
+        # Use mapping if available, otherwise use standard pattern
+        key_name = key_mappings.get(service, f"{service}_api_key")
         return self.config_data.get(key_name)
