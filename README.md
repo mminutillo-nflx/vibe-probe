@@ -180,13 +180,74 @@ reports/
         └── report.pdf       # PDF report (if configured)
 ```
 
-## Security Considerations
+## 🔒 Security Considerations
+
+### API Key Management
+
+**CRITICAL: Never commit API keys to version control!**
+
+#### How This Project Protects You:
+
+1. **`.gitignore` Protection** - The following files are automatically excluded from git:
+   - `.env` (your actual environment variables)
+   - `config.yaml` (your actual configuration)
+   - Any files matching `*_api_key*`, `*_token*`, `*_secret*`
+
+2. **Safe Templates Provided**:
+   - ✅ `.env.example` - Template with placeholders (safe to commit)
+   - ✅ `config.example.yaml` - Template with placeholders (safe to commit)
+   - ❌ `.env` - Your actual keys (NEVER commit)
+   - ❌ `config.yaml` - Your actual keys (NEVER commit)
+
+#### Best Practices:
+
+1. **Always use the example files as templates:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your ACTUAL keys
+   # .env will NOT be committed thanks to .gitignore
+   ```
+
+2. **Before pushing to git, double-check:**
+   ```bash
+   git status  # Verify .env and config.yaml are not listed
+   git diff    # Review changes before committing
+   ```
+
+3. **If you accidentally commit keys:**
+   ```bash
+   # Remove from git history immediately
+   git filter-branch --force --index-filter \
+     "git rm --cached --ignore-unmatch .env" \
+     --prune-empty --tag-name-filter cat -- --all
+
+   # Force push (if already pushed)
+   git push origin --force --all
+
+   # ROTATE YOUR API KEYS IMMEDIATELY
+   ```
+
+4. **Use environment variables in production:**
+   - Never hardcode keys in code
+   - Use `.env` for local development only
+   - In production, use secret management systems (AWS Secrets Manager, HashiCorp Vault, etc.)
+
+#### Verify Your Safety:
+
+Check that sensitive files are ignored:
+```bash
+git ls-files | grep -E '(\.env$|config\.yaml)'
+# Should only show .env.example and config.example.yaml
+```
+
+### Tool Usage Security
 
 - **Defensive Use Only**: This tool is designed for security research and authorized testing only
+- **Authorization Required**: Ensure you have explicit authorization before scanning any target
 - **Rate Limiting**: Respects rate limits and implements delays
-- **API Keys**: Never commit API keys to version control
-- **Legal Compliance**: Ensure you have authorization before scanning any target
+- **Legal Compliance**: Unauthorized scanning may violate laws (CFAA, GDPR, etc.)
 - **Data Protection**: Reports may contain sensitive information - store securely
+- **Network Exposure**: Some probes may trigger security alerts on target networks
 
 ## Requirements
 
