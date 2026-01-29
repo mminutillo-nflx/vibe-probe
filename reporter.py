@@ -1092,63 +1092,17 @@ class ReportGenerator:
         <div id="output-tab" class="tab-content">
             <div class="findings-section">
                 <div class="section-header">
-                    <div class="section-title">⚙️ Probe Execution Status</div>
-                </div>
-
-                {% if probe_status.successful %}
-                <h3 style="color: var(--success); margin-bottom: 12px;">✓ Successful ({{ probe_status.successful|length }})</h3>
-                <div class="probe-list">
-                    {% for probe in probe_status.successful %}
-                    <div class="probe-item successful">
-                        <span class="probe-name">{{ probe.name }}</span>
-                        <span class="probe-status successful">Success</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                {% if probe_status.failed %}
-                <h3 style="color: var(--critical); margin: 20px 0 12px;">✗ Failed ({{ probe_status.failed|length }})</h3>
-                <div class="probe-list">
-                    {% for probe in probe_status.failed %}
-                    <div class="probe-item failed">
-                        <div style="flex: 1;">
-                            <div class="probe-name">{{ probe.name }}</div>
-                            <div class="probe-error">{{ probe.error }}</div>
-                        </div>
-                        <span class="probe-status failed">Failed</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                {% if probe_status.skipped %}
-                <h3 style="color: var(--info); margin: 20px 0 12px;">⊘ Skipped ({{ probe_status.skipped|length }})</h3>
-                <div class="probe-list">
-                    {% for probe in probe_status.skipped %}
-                    <div class="probe-item skipped">
-                        <div style="flex: 1;">
-                            <div class="probe-name">{{ probe.name }}</div>
-                            <div class="probe-error">{{ probe.reason }}</div>
-                        </div>
-                        <span class="probe-status skipped">Skipped</span>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-
-            <div class="findings-section">
-                <div class="section-header">
-                    <div class="section-title">📄 Individual Probe Results</div>
+                    <div class="section-title">⚙️ Probe Execution Results</div>
                 </div>
 
                 {% for probe_name, probe_data in probes_data.items() %}
                 <div class="toggle-section" style="margin-bottom: 16px;">
                     <div class="toggle-header" onclick="toggleProbe('{{ probe_name }}')">
                         <div class="toggle-title" style="font-size: 1em;">
-                            <span>📦</span>
-                            <span>{{ probe_name }}</span>
+                            <span>
+                                {% if probe_data.get('status') == 'success' %}✓{% elif probe_data.get('status') == 'skipped' %}⊘{% else %}✗{% endif %}
+                            </span>
+                            <span style="margin-left: 8px;">{{ probe_name }}</span>
                             <span class="probe-status {{ probe_data.get('status', 'unknown') }}" style="margin-left: 12px;">
                                 {{ probe_data.get('status', 'unknown') }}
                             </span>
@@ -1156,6 +1110,12 @@ class ReportGenerator:
                         <div class="toggle-icon" id="{{ probe_name }}-icon">▶</div>
                     </div>
                     <div class="collapsible-content" id="{{ probe_name }}-content">
+                        {% if probe_data.get('error') %}
+                        <div style="margin-top: 16px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-left: 3px solid var(--critical); border-radius: 8px;">
+                            <strong style="color: var(--critical);">Error:</strong>
+                            <div style="color: var(--text-secondary); margin-top: 8px;">{{ probe_data.get('error') }}</div>
+                        </div>
+                        {% endif %}
                         <div style="margin-top: 16px;">
                             <div class="raw-data-content">
                                 <pre>{{ probe_data | tojson(indent=2) }}</pre>
