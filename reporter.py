@@ -591,7 +591,7 @@ class ReportGenerator:
 
         .probe-item.successful { border-left-color: var(--success); }
         .probe-item.failed { border-left-color: var(--critical); }
-        .probe-item.skipped { border-left-color: var(--info); }
+        .probe-item.skipped { border-left-color: var(--high); }
 
         .probe-name {
             font-weight: 500;
@@ -615,8 +615,8 @@ class ReportGenerator:
         }
 
         .probe-status.skipped {
-            background: rgba(107, 114, 128, 0.2);
-            color: var(--info);
+            background: rgba(249, 115, 22, 0.2);
+            color: var(--high);
         }
 
         .probe-error {
@@ -645,6 +645,8 @@ class ReportGenerator:
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--border);
+            max-width: 50%;
+            margin: 0 auto;
         }
 
         .screenshot-container img {
@@ -951,6 +953,10 @@ class ReportGenerator:
 
             .tab {
                 white-space: nowrap;
+            }
+
+            .screenshot-container {
+                max-width: 100%;
             }
         }
     </style>
