@@ -19,6 +19,8 @@ class HTTPProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Perform HTTP reconnaissance"""
+        self.logger.info(f"  → Testing HTTP/HTTPS connectivity for {self.target}")
+
         results = {
             "http": {},
             "https": {},
@@ -28,13 +30,17 @@ class HTTPProbe(BaseProbe):
 
         # Test both HTTP and HTTPS endpoints
         for scheme in ['http', 'https']:
+            self.logger.info(f"  → Probing {scheme.upper()} endpoint...")
             url = f"{scheme}://{self.target}"
             probe_result = await self._probe_url(url)
             results[scheme] = probe_result
 
             # Analyze security of accessible endpoints
             if probe_result.get("accessible"):
+                self.logger.info(f"  ✓ {scheme.upper()} is accessible (Status: {probe_result.get('status_code')})")
                 self._analyze_http_response(scheme, probe_result, results["findings"])
+            else:
+                self.logger.info(f"  ✗ {scheme.upper()} is not accessible")
 
         # Check for HTTP to HTTPS redirect
         if results["http"].get("accessible") and results["https"].get("accessible"):
@@ -57,14 +63,18 @@ class HTTPProbe(BaseProbe):
                 )
 
         # Check for robots.txt file and analyze directives
+        self.logger.info(f"  → Checking robots.txt...")
         results["robots_txt"] = await self._check_robots_txt()
 
         # Check sitemap
+        self.logger.info(f"  → Checking sitemap...")
         results["sitemap"] = await self._check_sitemap()
 
         # Capture screenshot of homepage
+        self.logger.info(f"  → Capturing homepage screenshot...")
         results["screenshot"] = await self._capture_screenshot()
 
+        self.logger.info(f"  ✓ HTTP probe completed")
         return results
 
     async def _probe_url(self, url: str) -> Dict[str, Any]:

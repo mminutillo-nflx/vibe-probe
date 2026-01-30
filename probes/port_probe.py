@@ -40,6 +40,8 @@ class PortProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Perform port scan"""
+        self.logger.info(f"  → Starting port scan for {self.target}")
+
         results = {
             "open_ports": [],
             "findings": []
@@ -47,20 +49,24 @@ class PortProbe(BaseProbe):
 
         # Resolve target to IP
         try:
+            self.logger.info(f"  → Resolving hostname to IP address...")
             ip = socket.gethostbyname(self.target)
             results["ip_address"] = ip
+            self.logger.info(f"  ✓ Resolved to {ip}")
         except socket.gaierror as e:
             results["error"] = f"Could not resolve hostname: {e}"
+            self.logger.warning(f"  ✗ Could not resolve hostname")
             return results
 
         # Scan common ports
-        self.logger.info(f"Scanning {len(self.COMMON_PORTS)} common ports...")
+        self.logger.info(f"  → Scanning {len(self.COMMON_PORTS)} common ports (this may take a minute)...")
 
         tasks = [self._scan_port(ip, port) for port in self.COMMON_PORTS.keys()]
         scan_results = await asyncio.gather(*tasks)
 
         for port, service, is_open in scan_results:
             if is_open:
+                self.logger.info(f"  ✓ Found open port: {port} ({service})")
                 results["open_ports"].append({
                     "port": port,
                     "service": service,
@@ -68,8 +74,10 @@ class PortProbe(BaseProbe):
                 })
 
         # Analyze findings
+        self.logger.info(f"  → Analyzing {len(results['open_ports'])} open ports...")
         self._analyze_ports(results["open_ports"], results["findings"])
 
+        self.logger.info(f"  ✓ Port scan completed")
         return results
 
     async def _scan_port(self, ip: str, port: int) -> tuple:

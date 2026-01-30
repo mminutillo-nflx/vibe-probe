@@ -14,6 +14,8 @@ class SSLProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Analyze SSL/TLS certificate"""
+        self.logger.info(f"  → Analyzing SSL/TLS certificate for {self.target}")
+
         results = {
             "certificate": {},
             "findings": [],
@@ -22,6 +24,7 @@ class SSLProbe(BaseProbe):
 
         try:
             # Get certificate
+            self.logger.info(f"  → Connecting to {self.target}:443...")
             context = ssl.create_default_context()
             with socket.create_connection((self.target, 443), timeout=10) as sock:
                 with context.wrap_socket(sock, server_hostname=self.target) as ssock:
@@ -45,11 +48,14 @@ class SSLProbe(BaseProbe):
 
                     # Check SSL/TLS version
                     results["protocol"] = ssock.version()
+                    self.logger.info(f"  ✓ Connected using {ssock.version()}")
 
                     # Analyze certificate
+                    self.logger.info(f"  → Analyzing certificate details...")
                     self._analyze_certificate(cert, results["findings"])
 
                     # Check for known vulnerabilities
+                    self.logger.info(f"  → Checking for SSL/TLS vulnerabilities...")
                     self._check_vulnerabilities(ssock, results["vulnerabilities"])
 
         except socket.timeout:
@@ -73,6 +79,7 @@ class SSLProbe(BaseProbe):
             results["error"] = str(e)
             self.logger.debug(f"SSL probe error: {e}")
 
+        self.logger.info(f"  ✓ SSL probe completed")
         return results
 
     def _get_san(self, cert) -> list:

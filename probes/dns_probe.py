@@ -1,5 +1,6 @@
 """DNS reconnaissance probe"""
 
+import asyncio
 import dns.resolver
 import dns.zone
 import dns.query
@@ -14,6 +15,8 @@ class DNSProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Perform DNS reconnaissance"""
+        self.logger.info(f"  → Querying DNS records for {self.target}")
+
         results = {
             "records": {},
             "findings": [],
@@ -22,24 +25,39 @@ class DNSProbe(BaseProbe):
 
         # Configure DNS resolver with timeout
         resolver = dns.resolver.Resolver()
-        resolver.timeout = 5.0  # 5 second timeout per query
-        resolver.lifetime = 10.0  # 10 second total timeout
+        resolver.timeout = 3.0  # 3 second timeout per query
+        resolver.lifetime = 5.0  # 5 second total timeout per record type
 
         # Query all record types
         for record_type in self.RECORD_TYPES:
             try:
-                answers = resolver.resolve(self.target, record_type)
+                # Progress indicator
+                self.logger.info(f"  → Checking {record_type} records...")
+
+                # Run DNS query in thread pool to avoid blocking (max 8 seconds)
+                answers = await asyncio.wait_for(
+                    asyncio.to_thread(resolver.resolve, self.target, record_type),
+                    timeout=8.0
+                )
                 records = [str(rdata) for rdata in answers]
                 results["records"][record_type] = records
+
+                if records:
+                    self.logger.info(f"  ✓ Found {len(records)} {record_type} record(s)")
 
                 # Analyze findings for security issues
                 self._analyze_records(record_type, records, results["findings"])
 
+            except asyncio.TimeoutError:
+                # Query took too long
+                self.logger.warning(f"  ⏱ {record_type} query timed out")
+                results["records"][record_type] = []
             except dns.resolver.NoAnswer:
                 # Record type exists but no data
                 results["records"][record_type] = []
             except dns.resolver.NXDOMAIN:
                 # Domain doesn't exist
+                self.logger.warning(f"  ✗ Domain does not exist (NXDOMAIN)")
                 results["findings"].append(
                     self._create_finding(
                         "critical",
@@ -51,18 +69,22 @@ class DNSProbe(BaseProbe):
                 break
             except dns.exception.Timeout:
                 # DNS query timed out
-                self.logger.warning(f"Timeout querying {record_type} records")
+                self.logger.warning(f"  ⏱ {record_type} query timed out")
                 results["records"][record_type] = []
             except Exception as e:
-                self.logger.debug(f"Error querying {record_type} records: {e}")
+                self.logger.debug(f"  ✗ Error querying {record_type} records: {e}")
+                results["records"][record_type] = []
 
         # Test for zone transfer vulnerability
         if results["records"].get("NS"):
+            self.logger.info(f"  → Testing zone transfer vulnerability...")
             results["zone_transfer"] = await self._check_zone_transfer(results["records"]["NS"])
 
         # Check for DNSSEC protection
+        self.logger.info(f"  → Checking DNSSEC configuration...")
         results["dnssec"] = await self._check_dnssec()
 
+        self.logger.info(f"  ✓ DNS probe completed")
         return results
 
     def _analyze_records(self, record_type: str, records: List[str], findings: List[Dict]):
@@ -135,13 +157,25 @@ class DNSProbe(BaseProbe):
         """Check for DNS zone transfer vulnerability"""
         results = {"vulnerable": False, "details": []}
 
-        for ns in nameservers:
+        for ns in nameservers[:3]:  # Limit to first 3 nameservers to avoid hanging
             try:
                 # Remove trailing dot and quotes
                 ns_clean = ns.strip('."')
-                ns_ip = str(dns.resolver.resolve(ns_clean, 'A')[0])
 
-                zone = dns.zone.from_xfr(dns.query.xfr(ns_ip, self.target))
+                # Resolve nameserver IP with timeout
+                ns_ip = await asyncio.wait_for(
+                    asyncio.to_thread(lambda: str(dns.resolver.resolve(ns_clean, 'A')[0])),
+                    timeout=5.0
+                )
+
+                # Attempt zone transfer with timeout
+                zone = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        lambda: dns.zone.from_xfr(dns.query.xfr(ns_ip, self.target))
+                    ),
+                    timeout=10.0
+                )
+
                 if zone:
                     results["vulnerable"] = True
                     results["details"].append({
@@ -149,6 +183,11 @@ class DNSProbe(BaseProbe):
                         "ip": ns_ip,
                         "status": "VULNERABLE"
                     })
+            except asyncio.TimeoutError:
+                results["details"].append({
+                    "nameserver": ns.strip('."'),
+                    "status": "timeout"
+                })
             except Exception:
                 results["details"].append({
                     "nameserver": ns.strip('."'),
@@ -160,11 +199,17 @@ class DNSProbe(BaseProbe):
     async def _check_dnssec(self) -> Dict[str, Any]:
         """Check if DNSSEC is enabled"""
         try:
-            answers = dns.resolver.resolve(self.target, 'DNSKEY')
+            # Query DNSKEY with timeout
+            answers = await asyncio.wait_for(
+                asyncio.to_thread(dns.resolver.resolve, self.target, 'DNSKEY'),
+                timeout=8.0
+            )
             return {
                 "enabled": True,
                 "keys": [str(rdata) for rdata in answers]
             }
+        except asyncio.TimeoutError:
+            return {"enabled": False, "error": "DNSSEC query timed out"}
         except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
             return {"enabled": False}
         except Exception as e:

@@ -11,6 +11,8 @@ class WhoisProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Perform WHOIS lookup"""
+        self.logger.info(f"  → Querying WHOIS information for {self.target}")
+
         results = {
             "whois_data": {},
             "findings": []
@@ -18,8 +20,10 @@ class WhoisProbe(BaseProbe):
 
         try:
             w = whois.whois(self.target)
+            self.logger.info(f"  ✓ WHOIS data retrieved")
 
             # Extract key information
+            self.logger.info(f"  → Parsing WHOIS data...")
             results["whois_data"] = {
                 "registrar": w.registrar,
                 "creation_date": self._format_date(w.creation_date),
@@ -38,6 +42,7 @@ class WhoisProbe(BaseProbe):
 
         except Exception as e:
             results["error"] = str(e)
+            self.logger.warning(f"  ✗ WHOIS lookup failed: {str(e)}")
             results["findings"].append(
                 self._create_finding(
                     "low",
@@ -46,6 +51,7 @@ class WhoisProbe(BaseProbe):
                 )
             )
 
+        self.logger.info(f"  ✓ WHOIS probe completed")
         return results
 
     def _format_date(self, date):
