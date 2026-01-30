@@ -461,6 +461,14 @@ class ReportGenerator:
             border-radius: 12px;
             text-align: center;
             border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            border-color: var(--primary-light);
         }
 
         .summary-number {
@@ -980,27 +988,27 @@ class ReportGenerator:
             <!-- Summary -->
             <div class="summary">
                 <div class="summary-grid">
-                    <div class="summary-card critical">
+                    <div class="summary-card critical" onclick="scrollToFindings('critical')">
                         <div class="summary-number">{{ summary.critical_count }}</div>
                         <div class="summary-label">Critical</div>
                     </div>
-                    <div class="summary-card high">
+                    <div class="summary-card high" onclick="scrollToFindings('high')">
                         <div class="summary-number">{{ summary.high_count }}</div>
                         <div class="summary-label">High</div>
                     </div>
-                    <div class="summary-card medium">
+                    <div class="summary-card medium" onclick="scrollToFindings('medium')">
                         <div class="summary-number">{{ summary.medium_count }}</div>
                         <div class="summary-label">Medium</div>
                     </div>
-                    <div class="summary-card low">
+                    <div class="summary-card low" onclick="scrollToFindings('low')">
                         <div class="summary-number">{{ summary.low_count }}</div>
                         <div class="summary-label">Low</div>
                     </div>
-                    <div class="summary-card">
+                    <div class="summary-card" onclick="scrollToFindings('info')">
                         <div class="summary-number">{{ summary.info_count }}</div>
                         <div class="summary-label">Info</div>
                     </div>
-                    <div class="summary-card">
+                    <div class="summary-card" onclick="scrollToTop()">
                         <div class="summary-number">{{ summary.total_findings }}</div>
                         <div class="summary-label">Total</div>
                     </div>
@@ -1044,7 +1052,7 @@ class ReportGenerator:
             <!-- Findings -->
             {% for severity in ['critical', 'high', 'medium', 'low', 'info'] %}
                 {% if findings[severity]|length > 0 %}
-                <div class="findings-section">
+                <div class="findings-section" id="findings-{{ severity }}">
                     <div class="section-header">
                         <div class="section-title">
                             {% if severity == 'critical' %}
@@ -1388,6 +1396,17 @@ class ReportGenerator:
                 content.classList.add('show');
                 icon.classList.add('open');
             }
+        }
+
+        function scrollToFindings(severity) {
+            const section = document.getElementById('findings-' + severity);
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // Restore preferences
