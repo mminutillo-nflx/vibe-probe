@@ -54,3 +54,5 @@ Thumbs.db
 *_api_key*
 *_token*
 *_secret*
+# SIDE team logo files (not part of vibe-probe)
+side-logos*.html
