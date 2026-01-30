@@ -5,6 +5,8 @@ Vibe Probe - An OSINT tool built to experiment and demonstrate Claude Code
 
 import argparse
 import asyncio
+import logging
+import os
 import sys
 from pathlib import Path
 from datetime import datetime, timezone
@@ -184,7 +186,7 @@ class VibeProbe:
             }
         except MissingAPIKeyError as e:
             # Probe requires API key that is not configured
-            self.logger.info(f"{name} probe skipped: {str(e)}")
+            self.logger.warning(f"{name} probe skipped: {str(e)}")
             self.results["probes"][name] = {
                 "priority": priority,
                 "status": "skipped",
@@ -281,19 +283,28 @@ Examples:
     for task in tasks:
         task.cancel()
 
-    # Wait briefly for cleanup
+    # Wait briefly for cleanup with timeout
     if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True),
+                timeout=2.0
+            )
+        except asyncio.TimeoutError:
+            pass  # Force exit even if cleanup times out
+
+    # Close all logging handlers
+    logging.shutdown()
 
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
-        # Explicitly exit after completion
-        sys.exit(0)
+        # Force immediate exit (bypass cleanup handlers that might hang)
+        os._exit(0)
     except KeyboardInterrupt:
         print("\n\nScan interrupted by user")
-        sys.exit(1)
+        os._exit(1)
     except Exception as e:
         print(f"\n✗ Fatal error: {e}")
-        sys.exit(1)
+        os._exit(1)
