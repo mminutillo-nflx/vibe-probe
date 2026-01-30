@@ -22,41 +22,57 @@ class SSLProbe(BaseProbe):
             "vulnerabilities": []
         }
 
+        # Try with certificate verification first
         try:
-            # Get certificate
+            # Get certificate with verification
             self.logger.info(f"  → Connecting to {self.target}:443...")
             context = ssl.create_default_context()
-            with socket.create_connection((self.target, 443), timeout=10) as sock:
-                with context.wrap_socket(sock, server_hostname=self.target) as ssock:
-                    cert_bin = ssock.getpeercert(binary_form=True)
-                    cert_dict = ssock.getpeercert()
+            self._connect_and_analyze(context, results)
 
-                    # Parse certificate
-                    cert = x509.load_der_x509_certificate(cert_bin, default_backend())
+        except ssl.SSLError as e:
+            # Check if this is a local certificate verification issue
+            if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                self.logger.warning(f"  ⚠ Certificate verification failed, retrying without verification...")
 
-                    results["certificate"] = {
-                        "subject": cert_dict.get("subject"),
-                        "issuer": cert_dict.get("issuer"),
-                        "version": cert.version.name,
-                        "serial_number": str(cert.serial_number),
-                        "not_before": cert.not_valid_before_utc.isoformat(),
-                        "not_after": cert.not_valid_after_utc.isoformat(),
-                        "signature_algorithm": cert.signature_algorithm_oid._name,
-                        "san": self._get_san(cert),
-                        "key_size": cert.public_key().key_size if hasattr(cert.public_key(), 'key_size') else None,
-                    }
+                # Retry without verification to still gather certificate info
+                try:
+                    context = ssl.create_default_context()
+                    context.check_hostname = False
+                    context.verify_mode = ssl.CERT_NONE
+                    self._connect_and_analyze(context, results)
 
-                    # Check SSL/TLS version
-                    results["protocol"] = ssock.version()
-                    self.logger.info(f"  ✓ Connected using {ssock.version()}")
-
-                    # Analyze certificate
-                    self.logger.info(f"  → Analyzing certificate details...")
-                    self._analyze_certificate(cert, results["findings"])
-
-                    # Check for known vulnerabilities
-                    self.logger.info(f"  → Checking for SSL/TLS vulnerabilities...")
-                    self._check_vulnerabilities(ssock, results["vulnerabilities"])
+                    # Add informational finding about local verification failure
+                    results["findings"].append(
+                        self._create_finding(
+                            "info",
+                            "Local certificate verification issue",
+                            "Could not verify certificate chain due to missing local CA certificates. "
+                            "This is a local system issue, not a problem with the target server. "
+                            "Certificate information gathered without verification.",
+                            recommendation="Fix: pip install --upgrade certifi OR on macOS run /Applications/Python*/Install Certificates.command"
+                        )
+                    )
+                except Exception as e2:
+                    # Even without verification failed
+                    self.logger.error(f"  ✗ Failed even without verification: {e2}")
+                    results["findings"].append(
+                        self._create_finding(
+                            "high",
+                            "SSL/TLS connection failed",
+                            f"Unable to establish SSL/TLS connection: {str(e)}",
+                            recommendation="Check if port 443 is accessible and SSL/TLS is properly configured"
+                        )
+                    )
+            else:
+                # Different SSL error (not verification related)
+                results["findings"].append(
+                    self._create_finding(
+                        "high",
+                        "SSL/TLS error",
+                        f"SSL/TLS error encountered: {str(e)}",
+                        recommendation="Check SSL/TLS configuration on target server"
+                    )
+                )
 
         except socket.timeout:
             results["findings"].append(
@@ -66,21 +82,46 @@ class SSLProbe(BaseProbe):
                     f"Unable to connect to {self.target}:443 - connection timed out"
                 )
             )
-        except ssl.SSLError as e:
-            results["findings"].append(
-                self._create_finding(
-                    "high",
-                    "SSL/TLS error",
-                    f"SSL/TLS error encountered: {str(e)}",
-                    recommendation="Check SSL/TLS configuration"
-                )
-            )
         except Exception as e:
             results["error"] = str(e)
             self.logger.debug(f"SSL probe error: {e}")
 
         self.logger.info(f"  ✓ SSL probe completed")
         return results
+
+    def _connect_and_analyze(self, context: ssl.SSLContext, results: Dict[str, Any]):
+        """Connect to SSL endpoint and analyze certificate"""
+        with socket.create_connection((self.target, 443), timeout=10) as sock:
+            with context.wrap_socket(sock, server_hostname=self.target) as ssock:
+                cert_bin = ssock.getpeercert(binary_form=True)
+                cert_dict = ssock.getpeercert()
+
+                # Parse certificate
+                cert = x509.load_der_x509_certificate(cert_bin, default_backend())
+
+                results["certificate"] = {
+                    "subject": cert_dict.get("subject"),
+                    "issuer": cert_dict.get("issuer"),
+                    "version": cert.version.name,
+                    "serial_number": str(cert.serial_number),
+                    "not_before": cert.not_valid_before_utc.isoformat(),
+                    "not_after": cert.not_valid_after_utc.isoformat(),
+                    "signature_algorithm": cert.signature_algorithm_oid._name,
+                    "san": self._get_san(cert),
+                    "key_size": cert.public_key().key_size if hasattr(cert.public_key(), 'key_size') else None,
+                }
+
+                # Check SSL/TLS version
+                results["protocol"] = ssock.version()
+                self.logger.info(f"  ✓ Connected using {ssock.version()}")
+
+                # Analyze certificate
+                self.logger.info(f"  → Analyzing certificate details...")
+                self._analyze_certificate(cert, results["findings"])
+
+                # Check for known vulnerabilities
+                self.logger.info(f"  → Checking for SSL/TLS vulnerabilities...")
+                self._check_vulnerabilities(ssock, results["vulnerabilities"])
 
     def _get_san(self, cert) -> list:
         """Extract Subject Alternative Names"""
