@@ -369,6 +369,29 @@ class ReportGenerator:
             padding: 40px 20px;
         }
 
+        /* Logo */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 30px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .logo-svg {
+            max-width: 200px;
+            height: auto;
+            margin-bottom: 15px;
+        }
+
+        .logo-tagline {
+            color: var(--text-secondary);
+            font-size: 0.95em;
+            font-style: italic;
+            margin-top: 10px;
+        }
+
         /* Header */
         .header {
             background: var(--primary);
@@ -963,6 +986,23 @@ class ReportGenerator:
 </head>
 <body>
     <div class="container">
+        <!-- Logo -->
+        <div class="logo-container">
+            <svg class="logo-svg" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+                <!-- Radar/Probe waves -->
+                <circle cx="40" cy="40" r="35" fill="none" stroke="#6366f1" stroke-width="2" opacity="0.3"/>
+                <circle cx="40" cy="40" r="28" fill="none" stroke="#6366f1" stroke-width="2" opacity="0.5"/>
+                <circle cx="40" cy="40" r="21" fill="none" stroke="#6366f1" stroke-width="2" opacity="0.7"/>
+                <circle cx="40" cy="40" r="14" fill="none" stroke="#6366f1" stroke-width="2" opacity="0.9"/>
+                <circle cx="40" cy="40" r="7" fill="#6366f1"/>
+
+                <!-- Text -->
+                <text x="90" y="35" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#f1f5f9">VIBE</text>
+                <text x="90" y="55" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#6366f1">PROBE</text>
+            </svg>
+            <div class="logo-tagline">An OSINT tool built to experiment and demonstrate Claude Code.<br>Not to be used for real production.</div>
+        </div>
+
         <!-- Header -->
         <div class="header">
             <h1>🔍 OSINT Reconnaissance Report</h1>
@@ -1351,7 +1391,8 @@ class ReportGenerator:
         <!-- Footer -->
         <div class="footer">
             <div style="font-size: 1.1em; font-weight: 600; margin-bottom: 8px;">Vibe Probe v1.0.0</div>
-            <div style="opacity: 0.6;">Comprehensive OSINT Reconnaissance Tool</div>
+            <div style="opacity: 0.6;">An OSINT tool built to experiment and demonstrate Claude Code.</div>
+            <div style="opacity: 0.6;">Not to be used for real production.</div>
         </div>
     </div>
 

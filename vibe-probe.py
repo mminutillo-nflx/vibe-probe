@@ -1,6 +1,6 @@
 #!/Library/Frameworks/Python.framework/Versions/3.14/bin/python3
 """
-Vibe Probe - Comprehensive OSINT Reconnaissance Tool
+Vibe Probe - An OSINT tool built to experiment and demonstrate Claude Code
 """
 
 import argparse
@@ -38,6 +38,20 @@ from utils.config import Config
 from utils.logger import setup_logger
 
 __version__ = "1.0.0"
+
+
+def print_banner():
+    """Display ASCII art banner"""
+    banner = """
+╦  ╦╦╔╗ ╔═╗  ╔═╗╦═╗╔═╗╔╗ ╔═╗
+╚╗╔╝║╠╩╗║╣   ╠═╝╠╦╝║ ║╠╩╗║╣
+ ╚╝ ╩╚═╝╚═╝  ╩  ╩╚═╚═╝╚═╝╚═╝
+
+An OSINT tool built to experiment and demonstrate Claude Code.
+Not to be used for real production.
+Version: {}
+    """.format(__version__)
+    print(banner)
 
 
 def check_first_run_warning() -> bool:
@@ -222,7 +236,7 @@ class VibeProbe:
 
 async def main():
     parser = argparse.ArgumentParser(
-        description="Vibe Probe - Comprehensive OSINT Reconnaissance Tool",
+        description="Vibe Probe - An OSINT tool built to experiment and demonstrate Claude Code",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -243,6 +257,9 @@ Examples:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     args = parser.parse_args()
+
+    # Display banner
+    print_banner()
 
     # Check for first-run warning
     if not check_first_run_warning():
