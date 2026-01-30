@@ -107,7 +107,7 @@ class VibeProbe:
         """Execute all OSINT probes concurrently"""
         self.logger.info(f"Starting comprehensive OSINT scan on: {self.target}")
 
-        # Define all probe modules with their priority
+        # Define probe modules with priority levels (critical > high > medium > low)
         probe_modules = [
             ("dns", dns_probe.DNSProbe, "critical"),
             ("whois", whois_probe.WhoisProbe, "high"),
@@ -131,30 +131,44 @@ class VibeProbe:
             ("asn", asn_probe.ASNProbe, "medium"),
         ]
 
-        # Create tasks for concurrent execution
+        # Build task list for concurrent execution
         tasks = []
         for probe_name, probe_class, priority in probe_modules:
+            # Only run probes selected by user config
             if self.config.should_run_probe(probe_name):
                 probe = probe_class(self.target, self.config)
                 task = self._run_probe(probe_name, probe, priority)
                 tasks.append(task)
 
-        # Execute all probes concurrently
+        # Execute all probes concurrently with error isolation
         await asyncio.gather(*tasks, return_exceptions=True)
 
         self.logger.info("All probes completed")
 
     async def _run_probe(self, name: str, probe: Any, priority: str):
-        """Run a single probe with error handling"""
+        """Run a single probe with timeout and error handling"""
+        # Set probe timeout: 60 seconds for most probes, 120 for port scans
+        timeout = 120 if name == "ports" else 60
+
         try:
             self.logger.info(f"Running {name} probe...")
-            result = await probe.scan()
+            # Run probe with timeout protection
+            result = await asyncio.wait_for(probe.scan(), timeout=timeout)
             self.results["probes"][name] = {
                 "priority": priority,
                 "status": "success",
                 "data": result
             }
+        except asyncio.TimeoutError:
+            # Probe exceeded timeout limit
+            self.logger.warning(f"{name} probe timed out after {timeout}s")
+            self.results["probes"][name] = {
+                "priority": priority,
+                "status": "skipped",
+                "error": f"Probe timed out after {timeout} seconds"
+            }
         except Exception as e:
+            # Handle all other errors
             self.logger.error(f"Error in {name} probe: {str(e)}")
             self.results["probes"][name] = {
                 "priority": priority,
@@ -163,14 +177,16 @@ class VibeProbe:
             }
 
     def generate_report(self, output_format: str = "all"):
-        """Generate comprehensive report"""
+        """Generate comprehensive report in multiple formats"""
         self.logger.info("Generating reports...")
 
         reporter = ReportGenerator(self.results, self.config)
 
+        # Create timestamped output directory
         output_dir = Path(self.config.output_dir) / self.target / datetime.now().strftime("%Y%m%d_%H%M%S")
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Generate requested report formats
         reports = []
         if output_format in ["all", "json"]:
             json_path = reporter.generate_json(output_dir)

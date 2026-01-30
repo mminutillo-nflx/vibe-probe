@@ -26,12 +26,13 @@ class HTTPProbe(BaseProbe):
             "redirects": []
         }
 
-        # Try both HTTP and HTTPS
+        # Test both HTTP and HTTPS endpoints
         for scheme in ['http', 'https']:
             url = f"{scheme}://{self.target}"
             probe_result = await self._probe_url(url)
             results[scheme] = probe_result
 
+            # Analyze security of accessible endpoints
             if probe_result.get("accessible"):
                 self._analyze_http_response(scheme, probe_result, results["findings"])
 
@@ -55,7 +56,7 @@ class HTTPProbe(BaseProbe):
                     )
                 )
 
-        # Check robots.txt
+        # Check for robots.txt file and analyze directives
         results["robots_txt"] = await self._check_robots_txt()
 
         # Check sitemap
@@ -67,7 +68,7 @@ class HTTPProbe(BaseProbe):
         return results
 
     async def _probe_url(self, url: str) -> Dict[str, Any]:
-        """Probe a specific URL"""
+        """Probe a specific URL with timeout protection"""
         result = {
             "accessible": False,
             "status_code": None,
@@ -78,6 +79,7 @@ class HTTPProbe(BaseProbe):
         }
 
         try:
+            # Set 10 second timeout for HTTP requests
             timeout = aiohttp.ClientTimeout(total=10)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(url, allow_redirects=True) as response:
@@ -90,8 +92,10 @@ class HTTPProbe(BaseProbe):
                     result["content_type"] = response.headers.get("Content-Type")
 
         except aiohttp.ClientError as e:
+            # Network or HTTP protocol errors
             result["error"] = str(e)
         except Exception as e:
+            # Catch-all for unexpected errors
             result["error"] = str(e)
             self.logger.debug(f"HTTP probe error for {url}: {e}")
 

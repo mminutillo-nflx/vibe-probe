@@ -20,19 +20,26 @@ class DNSProbe(BaseProbe):
             "nameservers": []
         }
 
+        # Configure DNS resolver with timeout
+        resolver = dns.resolver.Resolver()
+        resolver.timeout = 5.0  # 5 second timeout per query
+        resolver.lifetime = 10.0  # 10 second total timeout
+
         # Query all record types
         for record_type in self.RECORD_TYPES:
             try:
-                answers = dns.resolver.resolve(self.target, record_type)
+                answers = resolver.resolve(self.target, record_type)
                 records = [str(rdata) for rdata in answers]
                 results["records"][record_type] = records
 
-                # Analyze findings
+                # Analyze findings for security issues
                 self._analyze_records(record_type, records, results["findings"])
 
             except dns.resolver.NoAnswer:
+                # Record type exists but no data
                 results["records"][record_type] = []
             except dns.resolver.NXDOMAIN:
+                # Domain doesn't exist
                 results["findings"].append(
                     self._create_finding(
                         "critical",
@@ -42,14 +49,18 @@ class DNSProbe(BaseProbe):
                     )
                 )
                 break
+            except dns.exception.Timeout:
+                # DNS query timed out
+                self.logger.warning(f"Timeout querying {record_type} records")
+                results["records"][record_type] = []
             except Exception as e:
                 self.logger.debug(f"Error querying {record_type} records: {e}")
 
-        # Check for DNS zone transfer vulnerability
+        # Test for zone transfer vulnerability
         if results["records"].get("NS"):
             results["zone_transfer"] = await self._check_zone_transfer(results["records"]["NS"])
 
-        # Check for DNSSEC
+        # Check for DNSSEC protection
         results["dnssec"] = await self._check_dnssec()
 
         return results
@@ -57,6 +68,7 @@ class DNSProbe(BaseProbe):
     def _analyze_records(self, record_type: str, records: List[str], findings: List[Dict]):
         """Analyze DNS records for security findings"""
 
+        # Check TXT records for email security
         if record_type == "TXT":
             for record in records:
                 # Check for SPF
