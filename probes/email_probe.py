@@ -1,7 +1,7 @@
 """Email harvesting probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class EmailProbe(BaseProbe):
@@ -9,24 +9,12 @@ class EmailProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Harvest email addresses"""
+        # This probe requires implementation - skip for now
+        raise MissingAPIKeyError("Email harvesting requires full implementation and API integration")
+
         results = {
             "emails": [],
             "findings": []
         }
-
-        # Placeholder for email harvesting
-        # In production, search:
-        # - WHOIS records
-        # - Web pages
-        # - GitHub repositories
-        # - Public data sources
-
-        results["findings"].append(
-            self._create_finding(
-                "info",
-                "Email harvesting",
-                "Email discovery requires web scraping and API integration"
-            )
-        )
 
         return results

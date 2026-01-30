@@ -1,7 +1,7 @@
 """Social media mentions probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class SocialMediaProbe(BaseProbe):
@@ -9,6 +9,11 @@ class SocialMediaProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Search social media platforms"""
+        # Check for API keys
+        twitter_key = self.config.get_api_key("twitter")
+        if not twitter_key:
+            raise MissingAPIKeyError("Social media API keys not configured. Set TWITTER_API_KEY in .env")
+
         results = {
             "twitter": [],
             "reddit": [],
@@ -17,17 +22,11 @@ class SocialMediaProbe(BaseProbe):
         }
 
         # Placeholder for social media search
-        # In production, use:
-        # - Twitter API
-        # - Reddit API
-        # - LinkedIn API
-        # - Facebook Graph API
-
         results["findings"].append(
             self._create_finding(
                 "info",
                 "Social media search",
-                "Social media monitoring requires API keys for various platforms"
+                "Social media monitoring requires full implementation"
             )
         )
 

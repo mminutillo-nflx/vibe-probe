@@ -1,7 +1,7 @@
 """Wayback Machine probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class WaybackProbe(BaseProbe):
@@ -9,26 +9,14 @@ class WaybackProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Query Wayback Machine"""
+        # This probe requires full implementation
+        raise MissingAPIKeyError("Wayback Machine search requires full implementation with CDX API")
+
         results = {
             "snapshots": [],
             "first_seen": None,
             "last_seen": None,
             "findings": []
         }
-
-        # Placeholder for Wayback Machine integration
-        # In production, use Wayback CDX API to:
-        # - Find historical snapshots
-        # - Detect changes over time
-        # - Discover old pages/paths
-        # - Find removed content
-
-        results["findings"].append(
-            self._create_finding(
-                "info",
-                "Wayback Machine search",
-                "Historical data search requires Wayback CDX API integration"
-            )
-        )
 
         return results

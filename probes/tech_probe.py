@@ -1,7 +1,7 @@
 """Technology detection probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class TechProbe(BaseProbe):
@@ -9,6 +9,11 @@ class TechProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Detect technologies used by the target"""
+        # Check for API key first
+        api_key = self.config.get_api_key("builtwith")
+        if not api_key:
+            raise MissingAPIKeyError("Technology detection API key not configured. Set BUILTWITH_API_KEY in .env")
+
         results = {
             "technologies": {},
             "findings": []
@@ -25,7 +30,7 @@ class TechProbe(BaseProbe):
             self._create_finding(
                 "info",
                 "Technology detection",
-                "Technology fingerprinting requires additional API integration"
+                "Technology fingerprinting requires full implementation"
             )
         )
 

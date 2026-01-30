@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, List, Any
 
+from probes.base_probe import MissingAPIKeyError
 from probes import (
     dns_probe,
     whois_probe,
@@ -166,6 +167,14 @@ class VibeProbe:
                 "priority": priority,
                 "status": "skipped",
                 "error": f"Probe timed out after {timeout} seconds"
+            }
+        except MissingAPIKeyError as e:
+            # Probe requires API key that is not configured
+            self.logger.info(f"{name} probe skipped: {str(e)}")
+            self.results["probes"][name] = {
+                "priority": priority,
+                "status": "skipped",
+                "error": str(e)
             }
         except Exception as e:
             # Handle all other errors

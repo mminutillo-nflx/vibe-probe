@@ -2,7 +2,7 @@
 
 import socket
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class GeolocationProbe(BaseProbe):
@@ -10,33 +10,13 @@ class GeolocationProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Determine IP geolocation"""
+        # This probe requires full implementation
+        raise MissingAPIKeyError("Geolocation lookup requires full implementation with MaxMind or ipinfo.io API")
+
         results = {
             "ip": None,
             "location": {},
             "findings": []
         }
-
-        try:
-            # Get IP address
-            ip = socket.gethostbyname(self.target)
-            results["ip"] = ip
-
-            # Placeholder for geolocation lookup
-            # In production, use:
-            # - MaxMind GeoIP2
-            # - IP2Location
-            # - ipapi.co
-            # - ipinfo.io
-
-            results["findings"].append(
-                self._create_finding(
-                    "info",
-                    "Geolocation lookup",
-                    f"IP address: {ip}. Detailed geolocation requires API integration"
-                )
-            )
-
-        except Exception as e:
-            results["error"] = str(e)
 
         return results

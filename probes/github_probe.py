@@ -1,7 +1,7 @@
 """GitHub code search probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class GitHubProbe(BaseProbe):
@@ -9,6 +9,11 @@ class GitHubProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Search GitHub repositories"""
+        # Check for API token first
+        api_token = self.config.get_api_key("github")
+        if not api_token:
+            raise MissingAPIKeyError("GitHub API token not configured. Set GITHUB_TOKEN in .env")
+
         results = {
             "repositories": [],
             "code_mentions": [],
@@ -27,7 +32,7 @@ class GitHubProbe(BaseProbe):
             self._create_finding(
                 "info",
                 "GitHub search",
-                "GitHub code search requires API token for comprehensive results"
+                "GitHub code search requires full implementation"
             )
         )
 

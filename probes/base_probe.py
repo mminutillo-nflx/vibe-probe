@@ -5,6 +5,11 @@ from typing import Dict, Any
 import logging
 
 
+class MissingAPIKeyError(Exception):
+    """Raised when a probe requires an API key that is not configured"""
+    pass
+
+
 class BaseProbe(ABC):
     """Abstract base class for all probes"""
 

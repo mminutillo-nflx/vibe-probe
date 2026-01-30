@@ -1,7 +1,7 @@
 """Data breach checking probe"""
 
 from typing import Dict, Any
-from .base_probe import BaseProbe
+from .base_probe import BaseProbe, MissingAPIKeyError
 
 
 class BreachProbe(BaseProbe):
@@ -9,6 +9,11 @@ class BreachProbe(BaseProbe):
 
     async def scan(self) -> Dict[str, Any]:
         """Check breach databases"""
+        # Check for API key first
+        api_key = self.config.get_api_key("haveibeenpwned")
+        if not api_key:
+            raise MissingAPIKeyError("Have I Been Pwned API key not configured. Set HIBP_API_KEY in .env")
+
         results = {
             "breaches": [],
             "findings": []
@@ -25,7 +30,7 @@ class BreachProbe(BaseProbe):
             self._create_finding(
                 "info",
                 "Breach database check",
-                "Breach checking requires API integration (e.g., Have I Been Pwned)"
+                "Breach checking requires full implementation"
             )
         )
 
