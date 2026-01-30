@@ -259,10 +259,21 @@ Examples:
 
     print(f"\n✓ OSINT reconnaissance complete for {args.target}")
 
+    # Cancel any remaining tasks and cleanup
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    for task in tasks:
+        task.cancel()
+
+    # Wait briefly for cleanup
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
 
 if __name__ == "__main__":
     try:
         asyncio.run(main())
+        # Explicitly exit after completion
+        sys.exit(0)
     except KeyboardInterrupt:
         print("\n\nScan interrupted by user")
         sys.exit(1)

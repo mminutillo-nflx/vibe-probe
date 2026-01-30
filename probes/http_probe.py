@@ -213,29 +213,33 @@ class HTTPProbe(BaseProbe):
             for scheme in ['https', 'http']:
                 url = f"{scheme}://{self.target}"
                 try:
+                    # Use async context manager for automatic cleanup
                     async with async_playwright() as p:
                         browser = await p.chromium.launch(headless=True)
-                        context = await browser.new_context(
-                            viewport={'width': 1280, 'height': 720},
-                            user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
-                        )
-                        page = await context.new_page()
+                        try:
+                            context = await browser.new_context(
+                                viewport={'width': 1280, 'height': 720},
+                                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+                            )
+                            page = await context.new_page()
 
-                        # Navigate with timeout
-                        await page.goto(url, wait_until='networkidle', timeout=15000)
+                            # Navigate with timeout
+                            await page.goto(url, wait_until='networkidle', timeout=15000)
 
-                        # Take screenshot
-                        screenshot_bytes = await page.screenshot(full_page=False)
+                            # Take screenshot
+                            screenshot_bytes = await page.screenshot(full_page=False)
 
-                        # Convert to base64
-                        screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                            # Convert to base64
+                            screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
 
-                        result["success"] = True
-                        result["data"] = screenshot_base64
-                        result["url"] = url
+                            result["success"] = True
+                            result["data"] = screenshot_base64
+                            result["url"] = url
+                            break
 
-                        await browser.close()
-                        break
+                        finally:
+                            # Ensure browser is always closed
+                            await browser.close()
 
                 except Exception as e:
                     self.logger.debug(f"Screenshot failed for {url}: {e}")
